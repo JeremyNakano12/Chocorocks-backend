@@ -1,7 +1,7 @@
 package com.puce.chocorocks_backend.routes
 
 object Routes {
-    const val BASE_URL = "/api"
+    const val BASE_URL = "/chocorocks/api"
     const val CATEGORIES = "/categories"
     const val CLIENTS = "/clients"
     const val INVENTORY_MOVEMENTS = "/inventory-movements"
