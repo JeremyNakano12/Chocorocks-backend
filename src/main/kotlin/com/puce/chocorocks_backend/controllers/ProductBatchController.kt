@@ -7,9 +7,10 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.puce.chocorocks_backend.routes.Routes
 
 @RestController
-@RequestMapping("/api/product-batches")
+@RequestMapping(Routes.BASE_URL + Routes.PRODUCT_BATCHES)
 class ProductBatchController(
     private val productBatchService: ProductBatchService
 ) {
@@ -20,7 +21,7 @@ class ProductBatchController(
         return ResponseEntity.ok(batches)
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(Routes.ID)
     fun getProductBatchById(@PathVariable id: Long): ResponseEntity<ProductBatchResponse> {
         return try {
             val batch = productBatchService.findById(id)
@@ -40,7 +41,7 @@ class ProductBatchController(
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(Routes.ID)
     fun updateProductBatch(
         @PathVariable id: Long,
         @RequestBody request: ProductBatchRequest
@@ -53,7 +54,7 @@ class ProductBatchController(
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(Routes.ID)
     fun deleteProductBatch(@PathVariable id: Long): ResponseEntity<Void> {
         return try {
             productBatchService.delete(id)

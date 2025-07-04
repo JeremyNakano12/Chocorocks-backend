@@ -7,9 +7,10 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.puce.chocorocks_backend.routes.Routes
 
 @RestController
-@RequestMapping("/api/stores")
+@RequestMapping(Routes.BASE_URL + Routes.STORES)
 class StoreController(
     private val storeService: StoreService
 ) {
@@ -20,7 +21,7 @@ class StoreController(
         return ResponseEntity.ok(stores)
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(Routes.ID)
     fun getStoreById(@PathVariable id: Long): ResponseEntity<StoreResponse> {
         return try {
             val store = storeService.findById(id)
@@ -40,7 +41,7 @@ class StoreController(
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(Routes.ID)
     fun updateStore(
         @PathVariable id: Long,
         @RequestBody request: StoreRequest
@@ -53,7 +54,7 @@ class StoreController(
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(Routes.ID)
     fun deleteStore(@PathVariable id: Long): ResponseEntity<Void> {
         return try {
             storeService.delete(id)

@@ -7,9 +7,10 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.puce.chocorocks_backend.routes.Routes
 
 @RestController
-@RequestMapping("/api/sale-details")
+@RequestMapping(Routes.BASE_URL + Routes.SALE_DETAILS)
 class SaleDetailController(
     private val saleDetailService: SaleDetailService
 ) {
@@ -20,7 +21,7 @@ class SaleDetailController(
         return ResponseEntity.ok(saleDetails)
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(Routes.ID)
     fun getSaleDetailById(@PathVariable id: Long): ResponseEntity<SaleDetailResponse> {
         return try {
             val saleDetail = saleDetailService.findById(id)
@@ -40,7 +41,7 @@ class SaleDetailController(
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(Routes.ID)
     fun updateSaleDetail(
         @PathVariable id: Long,
         @RequestBody request: SaleDetailRequest
@@ -53,7 +54,7 @@ class SaleDetailController(
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(Routes.ID)
     fun deleteSaleDetail(@PathVariable id: Long): ResponseEntity<Void> {
         return try {
             saleDetailService.delete(id)

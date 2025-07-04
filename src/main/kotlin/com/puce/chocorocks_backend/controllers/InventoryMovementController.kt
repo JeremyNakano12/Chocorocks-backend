@@ -7,9 +7,10 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.puce.chocorocks_backend.routes.Routes
 
 @RestController
-@RequestMapping("/api/inventory-movements")
+@RequestMapping(Routes.BASE_URL + Routes.INVENTORY_MOVEMENTS)
 class InventoryMovementController(
     private val inventoryMovementService: InventoryMovementService
 ) {
@@ -20,7 +21,7 @@ class InventoryMovementController(
         return ResponseEntity.ok(movements)
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(Routes.ID)
     fun getInventoryMovementById(@PathVariable id: Long): ResponseEntity<InventoryMovementResponse> {
         return try {
             val movement = inventoryMovementService.findById(id)
@@ -40,7 +41,7 @@ class InventoryMovementController(
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(Routes.ID)
     fun updateInventoryMovement(
         @PathVariable id: Long,
         @RequestBody request: InventoryMovementRequest
@@ -53,7 +54,7 @@ class InventoryMovementController(
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(Routes.ID)
     fun deleteInventoryMovement(@PathVariable id: Long): ResponseEntity<Void> {
         return try {
             inventoryMovementService.delete(id)

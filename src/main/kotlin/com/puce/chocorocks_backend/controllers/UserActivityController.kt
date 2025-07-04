@@ -7,9 +7,10 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.puce.chocorocks_backend.routes.Routes
 
 @RestController
-@RequestMapping("/api/user-activities")
+@RequestMapping(Routes.BASE_URL + Routes.USER_ACTIVITIES)
 class UserActivityController(
     private val userActivityService: UserActivityService
 ) {
@@ -20,7 +21,7 @@ class UserActivityController(
         return ResponseEntity.ok(activities)
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(Routes.ID)
     fun getUserActivityById(@PathVariable id: Long): ResponseEntity<UserActivityResponse> {
         return try {
             val activity = userActivityService.findById(id)
@@ -40,7 +41,7 @@ class UserActivityController(
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(Routes.ID)
     fun updateUserActivity(
         @PathVariable id: Long,
         @RequestBody request: UserActivityRequest
@@ -53,7 +54,7 @@ class UserActivityController(
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(Routes.ID)
     fun deleteUserActivity(@PathVariable id: Long): ResponseEntity<Void> {
         return try {
             userActivityService.delete(id)

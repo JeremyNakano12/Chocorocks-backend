@@ -7,9 +7,10 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.puce.chocorocks_backend.routes.Routes
 
 @RestController
-@RequestMapping("/api/categories")
+@RequestMapping(Routes.BASE_URL + Routes.CATEGORIES)
 class CategoryController(
     private val categoryService: CategoryService
 ) {
@@ -20,7 +21,7 @@ class CategoryController(
         return ResponseEntity.ok(categories)
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(Routes.ID)
     fun getCategoryById(@PathVariable id: Long): ResponseEntity<CategoryResponse> {
         return try {
             val category = categoryService.findById(id)
@@ -36,7 +37,7 @@ class CategoryController(
         return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory)
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(Routes.ID)
     fun updateCategory(
         @PathVariable id: Long,
         @RequestBody request: CategoryRequest
@@ -49,7 +50,7 @@ class CategoryController(
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(Routes.ID)
     fun deleteCategory(@PathVariable id: Long): ResponseEntity<Void> {
         return try {
             categoryService.delete(id)
