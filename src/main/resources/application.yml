@@ -3,10 +3,10 @@ spring:
     name: chocorocks-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/chocorocks_db
+    url: ${SPRING_DATASOURCE_URL}
     driver-class-name: org.postgresql.Driver
-    username: admin
-    password: admin
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
 
   h2:
     console:
