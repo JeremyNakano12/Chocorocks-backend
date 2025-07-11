@@ -6,7 +6,5 @@ data class SaleDetailRequest(
     val saleId: Long,
     val productId: Long,
     val batchId: Long? = null,
-    val quantity: Int,
-    val unitPrice: BigDecimal,
-    val subtotal: BigDecimal
+    val quantity: Int
 )

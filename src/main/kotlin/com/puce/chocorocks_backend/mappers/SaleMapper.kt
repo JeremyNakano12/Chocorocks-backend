@@ -3,6 +3,7 @@ package com.puce.chocorocks_backend.mappers
 import com.puce.chocorocks_backend.dtos.requests.*
 import com.puce.chocorocks_backend.dtos.responses.*
 import com.puce.chocorocks_backend.models.entities.*
+import java.math.BigDecimal
 
 object SaleMapper {
     fun toEntity(
@@ -17,12 +18,12 @@ object SaleMapper {
             client = client,
             store = store,
             saleType = request.saleType,
-            subtotal = request.subtotal,
+            subtotal = BigDecimal.ZERO,
             discountPercentage = request.discountPercentage,
             discountAmount = request.discountAmount,
             taxPercentage = request.taxPercentage,
             taxAmount = request.taxAmount,
-            totalAmount = request.totalAmount,
+            totalAmount = BigDecimal.ZERO,
             paymentMethod = request.paymentMethod,
             notes = request.notes,
             isInvoiced = request.isInvoiced

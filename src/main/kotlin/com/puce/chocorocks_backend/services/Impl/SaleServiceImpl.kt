@@ -9,6 +9,7 @@ import com.puce.chocorocks_backend.models.entities.*
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Service
 @Transactional
@@ -16,7 +17,8 @@ class SaleServiceImpl(
     private val saleRepository: SaleRepository,
     private val userRepository: UserRepository,
     private val clientRepository: ClientRepository,
-    private val storeRepository: StoreRepository
+    private val storeRepository: StoreRepository,
+    private val saleDetailRepository: SaleDetailRepository
 ) : SaleService {
 
     override fun findAll(): List<SaleResponse> =
@@ -66,19 +68,23 @@ class SaleServiceImpl(
             client = client,
             store = store,
             saleType = request.saleType,
-            subtotal = request.subtotal,
+            subtotal = existingSale.subtotal, // Mantener los totales calculados
             discountPercentage = request.discountPercentage,
             discountAmount = request.discountAmount,
             taxPercentage = request.taxPercentage,
             taxAmount = request.taxAmount,
-            totalAmount = request.totalAmount,
+            totalAmount = existingSale.totalAmount, // Mantener los totales calculados
             paymentMethod = request.paymentMethod,
             notes = request.notes,
             isInvoiced = request.isInvoiced
         ).apply { this.id = existingSale.id }
 
         val savedSale = saleRepository.save(updatedSale)
-        return SaleMapper.toResponse(savedSale)
+
+        recalculateSaleTotals(savedSale.id)
+
+        val finalSale = saleRepository.findById(savedSale.id).get()
+        return SaleMapper.toResponse(finalSale)
     }
 
     override fun delete(id: Long) {
@@ -86,5 +92,38 @@ class SaleServiceImpl(
             throw EntityNotFoundException("Venta con ID $id no encontrada")
         }
         saleRepository.deleteById(id)
+    }
+
+    private fun recalculateSaleTotals(saleId: Long) {
+        val sale = saleRepository.findById(saleId).orElse(null) ?: return
+
+        val saleDetails = saleDetailRepository.findBySaleId(saleId)
+
+        val subtotal = saleDetails.sumOf { it.subtotal }
+
+        val totalWithDiscount = subtotal - sale.discountAmount
+
+        val taxAmount = totalWithDiscount * sale.taxPercentage / BigDecimal(100)
+
+        val totalAmount = totalWithDiscount + taxAmount
+
+        val updatedSale = Sale(
+            saleNumber = sale.saleNumber,
+            user = sale.user,
+            client = sale.client,
+            store = sale.store,
+            saleType = sale.saleType,
+            subtotal = subtotal,
+            discountPercentage = sale.discountPercentage,
+            discountAmount = sale.discountAmount,
+            taxPercentage = sale.taxPercentage,
+            taxAmount = taxAmount,
+            totalAmount = totalAmount,
+            paymentMethod = sale.paymentMethod,
+            notes = sale.notes,
+            isInvoiced = sale.isInvoiced
+        ).apply { this.id = sale.id }
+
+        saleRepository.save(updatedSale)
     }
 }

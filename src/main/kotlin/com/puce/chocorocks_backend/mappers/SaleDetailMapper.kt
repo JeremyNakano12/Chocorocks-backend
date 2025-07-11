@@ -3,21 +3,24 @@ package com.puce.chocorocks_backend.mappers
 import com.puce.chocorocks_backend.dtos.requests.*
 import com.puce.chocorocks_backend.dtos.responses.*
 import com.puce.chocorocks_backend.models.entities.*
+import java.math.BigDecimal
 
 object SaleDetailMapper {
     fun toEntity(
         request: SaleDetailRequest,
         sale: Sale,
         product: Product,
-        batch: ProductBatch? = null
+        batch: ProductBatch? = null,
+        unitPrice: BigDecimal,
+        subtotal: BigDecimal
     ): SaleDetail {
         return SaleDetail(
             sale = sale,
             product = product,
             batch = batch,
             quantity = request.quantity,
-            unitPrice = request.unitPrice,
-            subtotal = request.subtotal
+            unitPrice = unitPrice,
+            subtotal = subtotal
         )
     }
 

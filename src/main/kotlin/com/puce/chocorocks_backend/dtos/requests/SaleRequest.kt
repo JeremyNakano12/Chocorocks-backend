@@ -9,12 +9,10 @@ data class SaleRequest(
     val clientId: Long? = null,
     val storeId: Long,
     val saleType: SaleType,
-    val subtotal: BigDecimal = BigDecimal.ZERO,
     val discountPercentage: BigDecimal = BigDecimal.ZERO,
     val discountAmount: BigDecimal = BigDecimal.ZERO,
     val taxPercentage: BigDecimal = BigDecimal("12.00"),
     val taxAmount: BigDecimal = BigDecimal.ZERO,
-    val totalAmount: BigDecimal = BigDecimal.ZERO,
     val paymentMethod: String? = null,
     val notes: String? = null,
     val isInvoiced: Boolean = false
