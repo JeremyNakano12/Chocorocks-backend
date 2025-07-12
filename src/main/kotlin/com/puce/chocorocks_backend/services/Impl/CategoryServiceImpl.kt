@@ -9,6 +9,7 @@ import com.puce.chocorocks_backend.models.entities.*
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.puce.chocorocks_backend.exceptions.*
 
 @Service
 @Transactional
@@ -21,11 +22,25 @@ class CategoryServiceImpl(
 
     override fun findById(id: Long): CategoryResponse {
         val category = categoryRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Categoría con ID $id no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Categoría",
+                    identifier = id,
+                    detalles = listOf("Verifique que el ID sea correcto")
+                )
+            }
         return CategoryMapper.toResponse(category)
     }
 
     override fun save(request: CategoryRequest): CategoryResponse {
+        // Validaciones de negocio básicas
+        if (request.name.isBlank()) {
+            throw BusinessValidationException(
+                message = "El nombre de la categoría no puede estar vacío",
+                detalles = listOf("Proporcione un nombre válido para la categoría")
+            )
+        }
+
         val category = CategoryMapper.toEntity(request)
         val savedCategory = categoryRepository.save(category)
         return CategoryMapper.toResponse(savedCategory)
@@ -33,7 +48,21 @@ class CategoryServiceImpl(
 
     override fun update(id: Long, request: CategoryRequest): CategoryResponse {
         val existingCategory = categoryRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Categoría con ID $id no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Categoría",
+                    identifier = id,
+                    detalles = listOf("No se puede actualizar una categoría que no existe")
+                )
+            }
+
+        // Validaciones de negocio
+        if (request.name.isBlank()) {
+            throw BusinessValidationException(
+                message = "El nombre de la categoría no puede estar vacío",
+                detalles = listOf("Proporcione un nombre válido para la categoría")
+            )
+        }
 
         val updatedCategory = Category(
             name = request.name,
@@ -45,9 +74,23 @@ class CategoryServiceImpl(
     }
 
     override fun delete(id: Long) {
-        if (!categoryRepository.existsById(id)) {
-            throw EntityNotFoundException("Categoría con ID $id no encontrada")
+        val category = categoryRepository.findById(id)
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Categoría",
+                    identifier = id,
+                    detalles = listOf("No se puede eliminar una categoría que no existe")
+                )
+            }
+
+        try {
+            categoryRepository.deleteById(id)
+        } catch (ex: Exception) {
+            throw InvalidOperationException(
+                operation = "eliminar la categoría '${category.name}'",
+                reason = "tiene productos asociados",
+                detalles = listOf("Elimine primero todos los productos de esta categoría")
+            )
         }
-        categoryRepository.deleteById(id)
     }
 }

@@ -9,6 +9,7 @@ import com.puce.chocorocks_backend.models.entities.*
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.puce.chocorocks_backend.exceptions.*
 
 @Service
 @Transactional
@@ -23,16 +24,67 @@ class ProductStoreServiceImpl(
 
     override fun findById(id: Long): ProductStoreResponse {
         val productStore = productStoreRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Producto-Tienda con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto-Tienda",
+                    identifier = id,
+                    detalles = listOf("Verifique que el ID de la relación sea correcto")
+                )
+            }
         return ProductStoreMapper.toResponse(productStore)
     }
 
     override fun save(request: ProductStoreRequest): ProductStoreResponse {
-        val product = productRepository.findById(request.productId)
-            .orElseThrow { EntityNotFoundException("Producto con ID ${request.productId} no encontrado") }
+        // Validaciones de cantidades
+        if (request.currentStock < 0) {
+            throw InvalidQuantityException(
+                field = "stock actual",
+                value = request.currentStock,
+                detalles = listOf("El stock actual no puede ser negativo")
+            )
+        }
 
+        if (request.minStockLevel < 0) {
+            throw InvalidQuantityException(
+                field = "stock mínimo",
+                value = request.minStockLevel,
+                detalles = listOf("El stock mínimo no puede ser negativo")
+            )
+        }
+
+        // Validar que el producto existe
+        val product = productRepository.findById(request.productId)
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto",
+                    identifier = request.productId,
+                    detalles = listOf("Seleccione un producto válido")
+                )
+            }
+
+        // Validar que la tienda existe
         val store = storeRepository.findById(request.storeId)
-            .orElseThrow { EntityNotFoundException("Tienda con ID ${request.storeId} no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Tienda",
+                    identifier = request.storeId,
+                    detalles = listOf("Seleccione una tienda válida")
+                )
+            }
+
+        // Validar que no exista ya la relación producto-tienda
+        val relationExists = productStoreRepository.existsByProductIdAndStoreId(
+            request.productId,
+            request.storeId
+        )
+        if (relationExists) {
+            throw DuplicateResourceException(
+                resourceName = "Producto-Tienda",
+                field = "relación",
+                value = "${product.nameProduct} en ${store.name}",
+                detalles = listOf("El producto ya está asignado a esta tienda")
+            )
+        }
 
         val productStore = ProductStoreMapper.toEntity(request, product, store)
         val savedProductStore = productStoreRepository.save(productStore)
@@ -41,13 +93,64 @@ class ProductStoreServiceImpl(
 
     override fun update(id: Long, request: ProductStoreRequest): ProductStoreResponse {
         val existingProductStore = productStoreRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Producto-Tienda con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto-Tienda",
+                    identifier = id,
+                    detalles = listOf("No se puede actualizar una relación que no existe")
+                )
+            }
+
+        // Validaciones similares al save
+        if (request.currentStock < 0) {
+            throw InvalidQuantityException(
+                field = "stock actual",
+                value = request.currentStock,
+                detalles = listOf("El stock actual no puede ser negativo")
+            )
+        }
+
+        if (request.minStockLevel < 0) {
+            throw InvalidQuantityException(
+                field = "stock mínimo",
+                value = request.minStockLevel,
+                detalles = listOf("El stock mínimo no puede ser negativo")
+            )
+        }
 
         val product = productRepository.findById(request.productId)
-            .orElseThrow { EntityNotFoundException("Producto con ID ${request.productId} no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto",
+                    identifier = request.productId,
+                    detalles = listOf("Seleccione un producto válido")
+                )
+            }
 
         val store = storeRepository.findById(request.storeId)
-            .orElseThrow { EntityNotFoundException("Tienda con ID ${request.storeId} no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Tienda",
+                    identifier = request.storeId,
+                    detalles = listOf("Seleccione una tienda válida")
+                )
+            }
+
+        // Validar que no exista la relación con otros registros (excluyendo el actual)
+        val relationExists = productStoreRepository.findAll()
+            .any {
+                it.product.id == request.productId &&
+                        it.store.id == request.storeId &&
+                        it.id != id
+            }
+        if (relationExists) {
+            throw DuplicateResourceException(
+                resourceName = "Producto-Tienda",
+                field = "relación",
+                value = "${product.nameProduct} en ${store.name}",
+                detalles = listOf("Ya existe otra relación entre este producto y tienda")
+            )
+        }
 
         val updatedProductStore = ProductStore(
             product = product,
@@ -61,9 +164,23 @@ class ProductStoreServiceImpl(
     }
 
     override fun delete(id: Long) {
-        if (!productStoreRepository.existsById(id)) {
-            throw EntityNotFoundException("Producto-Tienda con ID $id no encontrado")
+        val productStore = productStoreRepository.findById(id)
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto-Tienda",
+                    identifier = id,
+                    detalles = listOf("No se puede eliminar una relación que no existe")
+                )
+            }
+
+        if (productStore.currentStock > 0) {
+            throw InvalidOperationException(
+                operation = "eliminar la relación '${productStore.product.nameProduct}' de '${productStore.store.name}'",
+                reason = "aún tiene stock disponible",
+                detalles = listOf("Stock actual: ${productStore.currentStock} unidades")
+            )
         }
+
         productStoreRepository.deleteById(id)
     }
 }

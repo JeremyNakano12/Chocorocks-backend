@@ -10,4 +10,6 @@ interface SaleDetailRepository : JpaRepository<SaleDetail, Long> {
 
     @Query("SELECT sd FROM SaleDetail sd WHERE sd.sale.id = :saleId")
     fun findBySaleId(@Param("saleId") saleId: Long): List<SaleDetail>
+
+    fun deleteBySaleId(saleId: Long)
 }

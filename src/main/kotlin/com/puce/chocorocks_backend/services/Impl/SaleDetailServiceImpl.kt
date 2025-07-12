@@ -10,6 +10,8 @@ import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import com.puce.chocorocks_backend.exceptions.*
+import com.puce.chocorocks_backend.utils.*
 
 @Service
 @Transactional
@@ -25,32 +27,77 @@ class SaleDetailServiceImpl(
 
     override fun findById(id: Long): SaleDetailResponse {
         val saleDetail = saleDetailRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Detalle de venta con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Detalle de venta",
+                    identifier = id,
+                    detalles = listOf("Verifique que el ID del detalle sea correcto")
+                )
+            }
         return SaleDetailMapper.toResponse(saleDetail)
     }
 
     override fun save(request: SaleDetailRequest): SaleDetailResponse {
+        // Validaciones de cantidad
+        ValidationUtils.validatePositiveQuantity(request.quantity, "cantidad")
+
+        // Validar que la venta existe
         val sale = saleRepository.findById(request.saleId)
-            .orElseThrow { EntityNotFoundException("Venta con ID ${request.saleId} no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Venta",
+                    identifier = request.saleId,
+                    detalles = listOf("Seleccione una venta válida")
+                )
+            }
 
+        // Validar que el producto existe
         val product = productRepository.findById(request.productId)
-            .orElseThrow { EntityNotFoundException("Producto con ID ${request.productId} no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto",
+                    identifier = request.productId,
+                    detalles = listOf("Seleccione un producto válido")
+                )
+            }
 
+        // Validar que el lote existe si se proporciona
         val batch = request.batchId?.let {
-            productBatchRepository.findById(it)
-                .orElseThrow { EntityNotFoundException("Lote con ID $it no encontrado") }
+            val productBatch = productBatchRepository.findById(it)
+                .orElseThrow {
+                    ResourceNotFoundException(
+                        resourceName = "Lote",
+                        identifier = it,
+                        detalles = listOf("Seleccione un lote válido")
+                    )
+                }
+
+            // Validar que el lote no esté expirado
+            ValidationUtils.validateBatchNotExpired(productBatch.expirationDate, productBatch.batchCode)
+
+            // Validar stock suficiente en el lote
+            ValidationUtils.validateSufficientStock(
+                available = productBatch.currentQuantity,
+                requested = request.quantity,
+                productName = product.nameProduct
+            )
+
+            productBatch
         }
 
+        // Calcular precio unitario según tipo de venta
         val unitPrice = when (sale.saleType) {
             SaleType.RETAIL -> product.retailPrice
             SaleType.WHOLESALE -> product.wholesalePrice
         }
 
+        // Calcular subtotal
         val subtotal = unitPrice * BigDecimal(request.quantity)
 
         val saleDetail = SaleDetailMapper.toEntity(request, sale, product, batch, unitPrice, subtotal)
         val savedSaleDetail = saleDetailRepository.save(saleDetail)
 
+        // Recalcular totales de la venta
         recalculateSaleTotals(sale.id)
 
         return SaleDetailMapper.toResponse(savedSaleDetail)
@@ -58,17 +105,53 @@ class SaleDetailServiceImpl(
 
     override fun update(id: Long, request: SaleDetailRequest): SaleDetailResponse {
         val existingSaleDetail = saleDetailRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Detalle de venta con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Detalle de venta",
+                    identifier = id,
+                    detalles = listOf("No se puede actualizar un detalle que no existe")
+                )
+            }
+
+        // Validaciones similares al save
+        ValidationUtils.validatePositiveQuantity(request.quantity, "cantidad")
 
         val sale = saleRepository.findById(request.saleId)
-            .orElseThrow { EntityNotFoundException("Venta con ID ${request.saleId} no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Venta",
+                    identifier = request.saleId,
+                    detalles = listOf("Seleccione una venta válida")
+                )
+            }
 
         val product = productRepository.findById(request.productId)
-            .orElseThrow { EntityNotFoundException("Producto con ID ${request.productId} no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Producto",
+                    identifier = request.productId,
+                    detalles = listOf("Seleccione un producto válido")
+                )
+            }
 
         val batch = request.batchId?.let {
-            productBatchRepository.findById(it)
-                .orElseThrow { EntityNotFoundException("Lote con ID $it no encontrado") }
+            val productBatch = productBatchRepository.findById(it)
+                .orElseThrow {
+                    ResourceNotFoundException(
+                        resourceName = "Lote",
+                        identifier = it,
+                        detalles = listOf("Seleccione un lote válido")
+                    )
+                }
+
+            ValidationUtils.validateBatchNotExpired(productBatch.expirationDate, productBatch.batchCode)
+            ValidationUtils.validateSufficientStock(
+                available = productBatch.currentQuantity,
+                requested = request.quantity,
+                productName = product.nameProduct
+            )
+
+            productBatch
         }
 
         val unitPrice = when (sale.saleType) {
@@ -88,7 +171,6 @@ class SaleDetailServiceImpl(
         ).apply { this.id = existingSaleDetail.id }
 
         val savedSaleDetail = saleDetailRepository.save(updatedSaleDetail)
-
         recalculateSaleTotals(sale.id)
 
         return SaleDetailMapper.toResponse(savedSaleDetail)
@@ -96,35 +178,28 @@ class SaleDetailServiceImpl(
 
     override fun delete(id: Long) {
         val saleDetail = saleDetailRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Detalle de venta con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Detalle de venta",
+                    identifier = id,
+                    detalles = listOf("No se puede eliminar un detalle que no existe")
+                )
+            }
 
         val saleId = saleDetail.sale.id
-
         saleDetailRepository.deleteById(id)
-
         recalculateSaleTotals(saleId)
     }
 
-    // Método interno para recalcular totales de la venta
     private fun recalculateSaleTotals(saleId: Long) {
         val sale = saleRepository.findById(saleId).orElse(null) ?: return
 
-        // Obtener todos los detalles de la venta
         val saleDetails = saleDetailRepository.findBySaleId(saleId)
-
-        // Calcular subtotal (suma de todos los subtotales de los detalles)
         val subtotal = saleDetails.sumOf { it.subtotal }
-
-        // Calcular total con descuento
         val totalWithDiscount = subtotal - sale.discountAmount
-
-        // Calcular impuestos sobre el total con descuento
         val taxAmount = totalWithDiscount * sale.taxPercentage / BigDecimal(100)
-
-        // Calcular total final
         val totalAmount = totalWithDiscount + taxAmount
 
-        // Actualizar la venta
         val updatedSale = Sale(
             saleNumber = sale.saleNumber,
             user = sale.user,

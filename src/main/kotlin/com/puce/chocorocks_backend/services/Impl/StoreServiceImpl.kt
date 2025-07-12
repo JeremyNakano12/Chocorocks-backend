@@ -9,6 +9,7 @@ import com.puce.chocorocks_backend.models.entities.*
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.puce.chocorocks_backend.exceptions.*
 
 @Service
 @Transactional
@@ -22,15 +23,45 @@ class StoreServiceImpl(
 
     override fun findById(id: Long): StoreResponse {
         val store = storeRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Tienda con ID $id no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Tienda",
+                    identifier = id,
+                    detalles = listOf("Verifique que el ID de la tienda sea correcto")
+                )
+            }
         return StoreMapper.toResponse(store)
     }
 
     override fun save(request: StoreRequest): StoreResponse {
+        // Validaciones de negocio básicas
+        validateStoreData(request)
+
+        // Validar nombre único
+        val nameExists = storeRepository.existsByName(request.name)
+        if (nameExists) {
+            throw DuplicateResourceException(
+                resourceName = "Tienda",
+                field = "nombre",
+                value = request.name,
+                detalles = listOf("El nombre de la tienda debe ser único")
+            )
+        }
+
+        // Validar que el manager existe si se proporciona
         val manager = request.managerId?.let {
             userRepository.findById(it)
-                .orElseThrow { EntityNotFoundException("Manager con ID $it no encontrado") }
+                .orElseThrow {
+                    ResourceNotFoundException(
+                        resourceName = "Usuario",
+                        identifier = it,
+                        detalles = listOf("Seleccione un manager válido")
+                    )
+                }
         }
+
+        // Validar horarios si se proporcionan
+        validateSchedule(request)
 
         val store = StoreMapper.toEntity(request, manager)
         val savedStore = storeRepository.save(store)
@@ -39,12 +70,42 @@ class StoreServiceImpl(
 
     override fun update(id: Long, request: StoreRequest): StoreResponse {
         val existingStore = storeRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Tienda con ID $id no encontrada") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Tienda",
+                    identifier = id,
+                    detalles = listOf("No se puede actualizar una tienda que no existe")
+                )
+            }
 
+        // Validaciones de negocio básicas
+        validateStoreData(request)
+
+        // Validar nombre único (excluyendo la tienda actual)
+        val nameExists = storeRepository.findAll()
+            .any { it.name == request.name && it.id != id }
+        if (nameExists) {
+            throw DuplicateResourceException(
+                resourceName = "Tienda",
+                field = "nombre",
+                value = request.name,
+                detalles = listOf("Ya existe otra tienda con este nombre")
+            )
+        }
+
+        // Validar manager
         val manager = request.managerId?.let {
             userRepository.findById(it)
-                .orElseThrow { EntityNotFoundException("Manager con ID $it no encontrado") }
+                .orElseThrow {
+                    ResourceNotFoundException(
+                        resourceName = "Usuario",
+                        identifier = it,
+                        detalles = listOf("Seleccione un manager válido")
+                    )
+                }
         }
+
+        validateSchedule(request)
 
         val updatedStore = Store(
             name = request.name,
@@ -62,9 +123,72 @@ class StoreServiceImpl(
     }
 
     override fun delete(id: Long) {
-        if (!storeRepository.existsById(id)) {
-            throw EntityNotFoundException("Tienda con ID $id no encontrada")
+        val store = storeRepository.findById(id)
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Tienda",
+                    identifier = id,
+                    detalles = listOf("No se puede eliminar una tienda que no existe")
+                )
+            }
+
+        try {
+            storeRepository.deleteById(id)
+        } catch (ex: Exception) {
+            throw InvalidOperationException(
+                operation = "eliminar la tienda '${store.name}'",
+                reason = "tiene ventas, productos o movimientos asociados",
+                detalles = listOf("No se puede eliminar una tienda con historial en el sistema")
+            )
         }
-        storeRepository.deleteById(id)
+    }
+
+    private fun validateStoreData(request: StoreRequest) {
+        if (request.name.isBlank()) {
+            throw BusinessValidationException(
+                message = "El nombre de la tienda no puede estar vacío",
+                detalles = listOf("Proporcione un nombre descriptivo para la tienda")
+            )
+        }
+
+        if (request.address.isBlank()) {
+            throw BusinessValidationException(
+                message = "La dirección de la tienda no puede estar vacía",
+                detalles = listOf("Proporcione una dirección válida")
+            )
+        }
+
+        // Validar formato de teléfono si se proporciona
+        request.phoneNumber?.let { phone ->
+            if (phone.isNotBlank() && phone.length < 7) {
+                throw BusinessValidationException(
+                    message = "Formato de teléfono inválido",
+                    detalles = listOf("El teléfono debe tener al menos 7 dígitos")
+                )
+            }
+        }
+    }
+
+    private fun validateSchedule(request: StoreRequest) {
+        val openTime = request.scheduleOpen
+        val closeTime = request.scheduleClosed
+
+        if (openTime != null && closeTime != null) {
+            if (openTime.isAfter(closeTime)) {
+                throw BusinessValidationException(
+                    message = "La hora de apertura no puede ser posterior a la hora de cierre",
+                    detalles = listOf("Apertura: $openTime, Cierre: $closeTime")
+                )
+            }
+        }
+
+        // Validar que si se proporciona una hora, se proporcione la otra
+        if ((openTime != null && closeTime == null) || (openTime == null && closeTime != null)) {
+            throw BusinessValidationException(
+                message = "Debe proporcionar tanto la hora de apertura como la de cierre",
+                detalles = listOf("Complete ambos horarios o deje ambos vacíos")
+            )
+        }
     }
 }
+

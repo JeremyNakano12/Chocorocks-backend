@@ -9,6 +9,8 @@ import com.puce.chocorocks_backend.models.entities.*
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.puce.chocorocks_backend.exceptions.*
+import com.puce.chocorocks_backend.utils.*
 
 @Service
 @Transactional
@@ -21,11 +23,32 @@ class UserServiceImpl(
 
     override fun findById(id: Long): UserResponse {
         val user = userRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Usuario con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Usuario",
+                    identifier = id,
+                    detalles = listOf("Verifique que el ID del usuario sea correcto")
+                )
+            }
         return UserMapper.toResponse(user)
     }
 
     override fun save(request: UserRequest): UserResponse {
+        validateUserData(request)
+
+        val emailExists = userRepository.existsByEmail(request.email)
+        ValidationUtils.validateUniqueEmail(emailExists, request.email)
+
+        val identificationExists = userRepository.existsByIdentificationNumber(request.identificationNumber)
+        if (identificationExists) {
+            throw DuplicateResourceException(
+                resourceName = "Usuario",
+                field = "número de identificación",
+                value = request.identificationNumber,
+                detalles = listOf("Ya existe un usuario con este número de identificación")
+            )
+        }
+
         val user = UserMapper.toEntity(request)
         val savedUser = userRepository.save(user)
         return UserMapper.toResponse(savedUser)
@@ -33,7 +56,26 @@ class UserServiceImpl(
 
     override fun update(id: Long, request: UserRequest): UserResponse {
         val existingUser = userRepository.findById(id)
-            .orElseThrow { EntityNotFoundException("Usuario con ID $id no encontrado") }
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Usuario",
+                    identifier = id,
+                    detalles = listOf("No se puede actualizar un usuario que no existe")
+                )
+            }
+
+        validateUserData(request)
+
+        val emailExists = userRepository.findAll()
+            .any { it.email == request.email && it.id != id }
+        if (emailExists) {
+            throw DuplicateResourceException(
+                resourceName = "Usuario",
+                field = "email",
+                value = request.email,
+                detalles = listOf("Ya existe otro usuario con este email")
+            )
+        }
 
         val updatedUser = User(
             name = request.name,
@@ -51,9 +93,54 @@ class UserServiceImpl(
     }
 
     override fun delete(id: Long) {
-        if (!userRepository.existsById(id)) {
-            throw EntityNotFoundException("Usuario con ID $id no encontrado")
+        val user = userRepository.findById(id)
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Usuario",
+                    identifier = id,
+                    detalles = listOf("No se puede eliminar un usuario que no existe")
+                )
+            }
+
+        try {
+            userRepository.deleteById(id)
+        } catch (ex: Exception) {
+            throw InvalidOperationException(
+                operation = "eliminar el usuario '${user.name}'",
+                reason = "tiene ventas o actividades asociadas",
+                detalles = listOf("No se puede eliminar un usuario con historial en el sistema")
+            )
         }
-        userRepository.deleteById(id)
+    }
+
+    private fun validateUserData(request: UserRequest) {
+        if (request.name.isBlank()) {
+            throw BusinessValidationException(
+                message = "El nombre del usuario no puede estar vacío",
+                detalles = listOf("Proporcione un nombre válido")
+            )
+        }
+
+        if (request.email.isBlank() || !request.email.contains("@")) {
+            throw BusinessValidationException(
+                message = "El email del usuario no es válido",
+                detalles = listOf("Proporcione un email con formato válido")
+            )
+        }
+
+        if (request.passwordHash.isBlank()) {
+            throw BusinessValidationException(
+                message = "La contraseña no puede estar vacía",
+                detalles = listOf("Proporcione una contraseña válida")
+            )
+        }
+
+        if (request.identificationNumber.isBlank()) {
+            throw BusinessValidationException(
+                message = "El número de identificación no puede estar vacío",
+                detalles = listOf("Proporcione un número de identificación válido")
+            )
+        }
     }
 }
+
