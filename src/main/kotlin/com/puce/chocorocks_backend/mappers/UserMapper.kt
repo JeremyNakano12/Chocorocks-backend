@@ -9,7 +9,6 @@ object UserMapper {
         return User(
             name = request.name,
             email = request.email,
-            passwordHash = request.passwordHash,
             role = request.role,
             typeIdentification = request.typeIdentification,
             identificationNumber = request.identificationNumber,

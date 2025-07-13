@@ -80,7 +80,6 @@ class UserServiceImpl(
         val updatedUser = User(
             name = request.name,
             email = request.email,
-            passwordHash = request.passwordHash,
             role = request.role,
             typeIdentification = request.typeIdentification,
             identificationNumber = request.identificationNumber,
@@ -128,12 +127,6 @@ class UserServiceImpl(
             )
         }
 
-        if (request.passwordHash.isBlank()) {
-            throw BusinessValidationException(
-                message = "La contraseña no puede estar vacía",
-                detalles = listOf("Proporcione una contraseña válida")
-            )
-        }
 
         if (request.identificationNumber.isBlank()) {
             throw BusinessValidationException(

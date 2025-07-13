@@ -11,9 +11,6 @@ data class User(
     @Column(name = "email", nullable = false, unique = true, length = 150)
     val email: String,
 
-    @Column(name = "password_hash", nullable = false, length = 255)
-    val passwordHash: String,
-
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     val role: UserRole,
