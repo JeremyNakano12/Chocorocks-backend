@@ -8,6 +8,8 @@ import com.puce.chocorocks_backend.exceptions.ResourceNotFoundException
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
 import com.puce.chocorocks_backend.routes.Routes
 import java.time.LocalDateTime
@@ -16,7 +18,9 @@ import java.time.format.DateTimeFormatter
 @RestController
 @RequestMapping(Routes.BASE_URL + Routes.RECEIPTS)
 class ReceiptController(
-    private val receiptService: ReceiptService
+    private val receiptService: ReceiptService,
+    private val xmlGeneratorService: XMLGeneratorService,
+    private val emailService: EmailService
 ) {
 
     @GetMapping
@@ -88,13 +92,110 @@ class ReceiptController(
         }
     }
 
+    @GetMapping("${Routes.ID}/download-xml")
+    fun downloadReceiptXml(@PathVariable id: Long): ResponseEntity<ByteArray> {
+        return try {
+            val receipt = receiptService.findById(id)
+            val xmlBytes = xmlGeneratorService.generateReceiptXmlBytes(receipt)
+
+            val headers = HttpHeaders()
+            headers.contentType = MediaType.APPLICATION_XML
+            headers.setContentDispositionFormData("attachment", "recibo_${receipt.receiptNumber}.xml")
+            headers.contentLength = xmlBytes.size.toLong()
+
+            ResponseEntity.ok()
+                .headers(headers)
+                .body(xmlBytes)
+
+        } catch (e: EntityNotFoundException) {
+            ResponseEntity.notFound().build()
+        }
+    }
+
+    @GetMapping("${Routes.ID}/view-xml")
+    fun viewReceiptXml(@PathVariable id: Long): ResponseEntity<String> {
+        return try {
+            val receipt = receiptService.findById(id)
+            val xmlContent = xmlGeneratorService.generateReceiptXml(receipt)
+
+            val headers = HttpHeaders()
+            headers.contentType = MediaType.APPLICATION_XML
+
+            ResponseEntity.ok()
+                .headers(headers)
+                .body(xmlContent)
+
+        } catch (e: EntityNotFoundException) {
+            ResponseEntity.notFound().build()
+        }
+    }
+
+    @PostMapping("${Routes.ID}/send-email")
+    fun sendReceiptByEmail(
+        @PathVariable id: Long,
+        @RequestBody request: EmailRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            val receipt = receiptService.findById(id)
+
+            val success = if (request.recipientEmail != null) {
+                emailService.sendReceiptByEmail(receipt, request.recipientEmail)
+            } else if (request.useClientEmail) {
+                emailService.sendReceiptByEmail(receipt)
+            } else {
+                throw IllegalArgumentException("Debe especificar un email o usar el email del cliente")
+            }
+
+            val response: Map<String, Any> = mapOf(
+                "success" to success,
+                "message" to "Recibo enviado exitosamente por email",
+                "receiptNumber" to receipt.receiptNumber,
+                "emailSentTo" to (request.recipientEmail ?: receipt.client?.email ?: ""),
+                "timestamp" to LocalDateTime.now().toString()
+            )
+
+            ResponseEntity.ok(response)
+
+        } catch (e: EntityNotFoundException) {
+            ResponseEntity.notFound().build()
+        } catch (e: IllegalArgumentException) {
+            val errorResponse: Map<String, Any> = mapOf(
+                "success" to false,
+                "message" to (e.message ?: "Error en la solicitud"),
+                "timestamp" to LocalDateTime.now().toString()
+            )
+            ResponseEntity.badRequest().body(errorResponse)
+        }
+    }
+
+    @PostMapping("${Routes.ID}/send-to-client")
+    fun sendReceiptToClient(@PathVariable id: Long): ResponseEntity<Map<String, Any>> {
+        return try {
+            val receipt = receiptService.findById(id)
+            val success = emailService.sendReceiptByEmail(receipt)
+
+            val response: Map<String, Any> = mapOf(
+                "success" to success,
+                "message" to "Recibo enviado al cliente exitosamente",
+                "receiptNumber" to receipt.receiptNumber,
+                "clientEmail" to (receipt.client?.email ?: ""),
+                "clientName" to (receipt.client?.nameLastname ?: ""),
+                "timestamp" to LocalDateTime.now().toString()
+            )
+
+            ResponseEntity.ok(response)
+
+        } catch (e: EntityNotFoundException) {
+            ResponseEntity.notFound().build()
+        }
+    }
+
     @GetMapping("/sale/{saleId}")
     fun getReceiptBySaleId(@PathVariable saleId: Long): ResponseEntity<ReceiptResponse> {
         val receipt = receiptService.findBySaleId(saleId)
         return if (receipt != null) {
             ResponseEntity.ok(receipt)
         } else {
-            // Lanzar excepción para que el GlobalExceptionHandler la maneje con mensaje apropiado
             throw ResourceNotFoundException(
                 resourceName = "Recibo",
                 identifier = "venta ID $saleId",

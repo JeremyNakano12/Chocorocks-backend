@@ -30,6 +30,11 @@ dependencies {
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
+	implementation("org.springframework.boot:spring-boot-starter-mail")
+	implementation("jakarta.xml.bind:jakarta.xml.bind-api:4.0.1")
+	implementation("org.glassfish.jaxb:jaxb-runtime:4.0.4")
+	implementation("org.glassfish.jaxb:jaxb-core:4.0.4")
+	implementation("jakarta.annotation:jakarta.annotation-api:2.1.1")
 }
 
 kotlin {

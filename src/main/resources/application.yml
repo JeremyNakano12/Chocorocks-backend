@@ -17,3 +17,26 @@ spring:
       ddl-auto: update
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:jeremarinx1@gmail.com}
+    password: ${MAIL_PASSWORD:sibq hliy ahbq xerd}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          timeout: 8000
+          connectiontimeout: 8000
+          writetimeout: 8000
+
+  app:
+    company:
+      name: ${COMPANY_NAME:Chocorocks}
+      support-email: ${SUPPORT_EMAIL:soporte@chocorocks.com}
+    xml:
+      encoding: UTF-8
+      format-output: true
