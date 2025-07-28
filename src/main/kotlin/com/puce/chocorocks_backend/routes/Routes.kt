@@ -14,4 +14,5 @@ object Routes {
     const val USERS = "/users"
     const val USER_ACTIVITIES = "/user-activities"
     const val ID = "/{id}"
+    const val RECEIPTS = "/receipts"
 }

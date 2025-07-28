@@ -56,5 +56,6 @@ data class Sale(
     val saleDetails: MutableList<SaleDetail> = mutableListOf(),
 
     @OneToOne(mappedBy = "sale", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    val invoice: Invoice? = null
+    val receipt: Receipt? = null
+
 ) : BaseEntity()

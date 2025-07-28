@@ -35,5 +35,5 @@ data class User(
     val sales: MutableList<Sale> = mutableListOf(),
 
     @OneToMany(mappedBy = "user")
-    val invoices: MutableList<Invoice> = mutableListOf()
+    val invoices: MutableList<Receipt> = mutableListOf()
 ) : BaseEntity()

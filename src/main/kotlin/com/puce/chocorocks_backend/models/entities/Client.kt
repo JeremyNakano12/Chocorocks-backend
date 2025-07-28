@@ -35,5 +35,5 @@ data class Client(
     val sales: MutableList<Sale> = mutableListOf(),
 
     @OneToMany(mappedBy = "client", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    val invoices: MutableList<Invoice> = mutableListOf()
+    val invoices: MutableList<Receipt> = mutableListOf()
 ) : BaseEntity()

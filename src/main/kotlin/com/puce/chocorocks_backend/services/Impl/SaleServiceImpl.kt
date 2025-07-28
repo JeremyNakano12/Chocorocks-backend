@@ -19,7 +19,9 @@ class SaleServiceImpl(
     private val userRepository: UserRepository,
     private val clientRepository: ClientRepository,
     private val storeRepository: StoreRepository,
-    private val saleDetailRepository: SaleDetailRepository
+    private val saleDetailRepository: SaleDetailRepository,
+    // *** NUEVA DEPENDENCIA AGREGADA ***
+    private val receiptService: ReceiptService
 ) : SaleService {
 
     override fun findAll(): List<SaleResponse> =
@@ -185,7 +187,68 @@ class SaleServiceImpl(
             )
         }
 
+        // *** NUEVA VALIDACIÓN: Verificar si tiene recibo asociado ***
+        val receipt = receiptService.findBySaleId(sale.id)
+        if (receipt != null) {
+            throw InvalidOperationException(
+                operation = "eliminar la venta '${sale.saleNumber}'",
+                reason = "ya tiene un recibo asociado",
+                detalles = listOf("Cancele primero el recibo: ${receipt.receiptNumber}")
+            )
+        }
+
         saleRepository.deleteById(id)
+    }
+
+    // *** NUEVO MÉTODO AGREGADO AL SERVICIO EXISTENTE ***
+    fun completeWithReceipt(id: Long, paymentMethod: String?, additionalNotes: String?): ReceiptResponse {
+        val sale = saleRepository.findById(id)
+            .orElseThrow {
+                ResourceNotFoundException(
+                    resourceName = "Venta",
+                    identifier = id,
+                    detalles = listOf("Venta no encontrada para generar recibo")
+                )
+            }
+
+        // Verificar que la venta tenga detalles
+        val saleDetails = saleDetailRepository.findBySaleId(id)
+        if (saleDetails.isEmpty()) {
+            throw BusinessValidationException(
+                message = "No se puede generar recibo para una venta sin productos",
+                detalles = listOf("Agregue productos a la venta antes de generar el recibo")
+            )
+        }
+
+        // Verificar que no tenga ya un recibo
+        val existingReceipt = receiptService.findBySaleId(id)
+        if (existingReceipt != null) {
+            throw DuplicateResourceException(
+                resourceName = "Recibo",
+                field = "venta",
+                value = id,
+                detalles = listOf("La venta ya tiene un recibo: ${existingReceipt.receiptNumber}")
+            )
+        }
+
+        // Generar número de recibo automático
+        val receiptNumber = receiptService.generateReceiptNumber(sale.store.id)
+
+        // Crear request para el recibo
+        val receiptRequest = ReceiptRequest(
+            receiptNumber = receiptNumber,
+            userId = sale.user.id,
+            clientId = sale.client?.id,
+            saleId = sale.id,
+            storeId = sale.store.id,
+            receiptStatus = ReceiptStatus.ACTIVE,
+            paymentMethod = paymentMethod ?: sale.paymentMethod,
+            additionalNotes = additionalNotes,
+            customerName = sale.client?.nameLastname,
+            customerIdentification = sale.client?.identificationNumber
+        )
+
+        return receiptService.save(receiptRequest)
     }
 
     private fun validateSaleData(request: SaleRequest) {

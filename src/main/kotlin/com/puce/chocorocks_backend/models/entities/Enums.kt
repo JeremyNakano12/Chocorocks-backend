@@ -1,5 +1,10 @@
 package com.puce.chocorocks_backend.models.entities
 
+//Receipt
+enum class ReceiptStatus {
+    ACTIVE, CANCELLED, REFUNDED
+}
+
 //InventoryMovement
 enum class MovementType {
     IN, OUT, TRANSFER
