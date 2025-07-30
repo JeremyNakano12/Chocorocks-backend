@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.puce.chocorocks_backend.routes.Routes
 
-// *** DTO ESPECÍFICO PARA EL ENDPOINT DE COMPLETAR VENTA CON RECIBO ***
 data class CompleteWithReceiptRequest(
     val paymentMethod: String? = null,
     val additionalNotes: String? = null
@@ -20,7 +19,6 @@ data class CompleteWithReceiptRequest(
 @RequestMapping(Routes.BASE_URL + Routes.SALES)
 class SaleController(
     private val saleService: SaleService,
-    // *** INYECCIÓN ESPECÍFICA PARA ACCEDER AL MÉTODO ADICIONAL ***
     private val saleServiceImpl: SaleServiceImpl
 ) {
 
@@ -73,7 +71,6 @@ class SaleController(
         }
     }
 
-    // *** NUEVO ENDPOINT PARA COMPLETAR VENTA Y GENERAR RECIBO AUTOMÁTICAMENTE ***
     @PostMapping("${Routes.ID}/complete-with-receipt")
     fun completeWithReceipt(
         @PathVariable id: Long,

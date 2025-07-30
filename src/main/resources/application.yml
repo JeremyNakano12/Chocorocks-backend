@@ -21,8 +21,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:placeholder}
-    password: ${MAIL_PASSWORD:placeholder}
+    username: ${MAIL_USERNAME:MailUsername}
+    password: ${MAIL_PASSWORD:MailPassword}
     properties:
       mail:
         smtp:
@@ -33,10 +33,30 @@ spring:
           connectiontimeout: 8000
           writetimeout: 8000
 
-  app:
-    company:
-      name: ${COMPANY_NAME:Chocorocks}
-      support-email: ${SUPPORT_EMAIL:soporte@chocorocks.com}
-    xml:
-      encoding: UTF-8
-      format-output: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SUPABASE_URL:SupabaseURL}/auth/v1
+
+supabase:
+  url: ${SUPABASE_URL:SupabaseURL}
+  anon:
+    key: ${SUPABASE_ANON_KEY:AnonKey}
+  jwt:
+    secret: ${SUPABASE_JWT_SECRET:Secret}
+
+app:
+  company:
+    name: ${COMPANY_NAME:Chocorocks}
+    support-email: ${SUPPORT_EMAIL:soporte@chocorocks.com}
+  xml:
+    encoding: UTF-8
+    format-output: true
+  data:
+    seed: ${ENABLE_DATA_SEEDING:true}
+
+logging:
+  level:
+    com.puce.chocorocks_backend.security: DEBUG
+    org.springframework.security: DEBUG

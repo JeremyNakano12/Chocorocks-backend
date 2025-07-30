@@ -33,7 +33,6 @@ class CategoryServiceImpl(
     }
 
     override fun save(request: CategoryRequest): CategoryResponse {
-        // Validaciones de negocio básicas
         if (request.name.isBlank()) {
             throw BusinessValidationException(
                 message = "El nombre de la categoría no puede estar vacío",
@@ -56,7 +55,6 @@ class CategoryServiceImpl(
                 )
             }
 
-        // Validaciones de negocio
         if (request.name.isBlank()) {
             throw BusinessValidationException(
                 message = "El nombre de la categoría no puede estar vacío",

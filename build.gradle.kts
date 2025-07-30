@@ -35,6 +35,11 @@ dependencies {
 	implementation("org.glassfish.jaxb:jaxb-runtime:4.0.4")
 	implementation("org.glassfish.jaxb:jaxb-core:4.0.4")
 	implementation("jakarta.annotation:jakarta.annotation-api:2.1.1")
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+	implementation("io.jsonwebtoken:jjwt-impl:0.12.3")
+	implementation("io.jsonwebtoken:jjwt-jackson:0.12.3")
+	implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
 
 kotlin {

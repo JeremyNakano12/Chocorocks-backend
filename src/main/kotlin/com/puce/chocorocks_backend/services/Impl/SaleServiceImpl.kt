@@ -20,7 +20,6 @@ class SaleServiceImpl(
     private val clientRepository: ClientRepository,
     private val storeRepository: StoreRepository,
     private val saleDetailRepository: SaleDetailRepository,
-    // *** NUEVA DEPENDENCIA AGREGADA ***
     private val receiptService: ReceiptService
 ) : SaleService {
 
@@ -40,10 +39,8 @@ class SaleServiceImpl(
     }
 
     override fun save(request: SaleRequest): SaleResponse {
-        // Validaciones de negocio básicas
         validateSaleData(request)
 
-        // Validar número de venta único
         val saleNumberExists = saleRepository.existsBySaleNumber(request.saleNumber)
         if (saleNumberExists) {
             throw DuplicateResourceException(
@@ -54,7 +51,6 @@ class SaleServiceImpl(
             )
         }
 
-        // Validar que el usuario existe
         val user = userRepository.findById(request.userId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -64,7 +60,6 @@ class SaleServiceImpl(
                 )
             }
 
-        // Validar que el cliente existe si se proporciona
         val client = request.clientId?.let {
             clientRepository.findById(it)
                 .orElseThrow {
@@ -76,7 +71,6 @@ class SaleServiceImpl(
                 }
         }
 
-        // Validar que la tienda existe
         val store = storeRepository.findById(request.storeId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -101,10 +95,8 @@ class SaleServiceImpl(
                 )
             }
 
-        // Validaciones similares al save
         validateSaleData(request)
 
-        // Validar número único (excluyendo venta actual)
         val saleNumberExists = saleRepository.findAll()
             .any { it.saleNumber == request.saleNumber && it.id != id }
         if (saleNumberExists) {
@@ -187,7 +179,6 @@ class SaleServiceImpl(
             )
         }
 
-        // *** NUEVA VALIDACIÓN: Verificar si tiene recibo asociado ***
         val receipt = receiptService.findBySaleId(sale.id)
         if (receipt != null) {
             throw InvalidOperationException(
@@ -200,7 +191,6 @@ class SaleServiceImpl(
         saleRepository.deleteById(id)
     }
 
-    // *** NUEVO MÉTODO AGREGADO AL SERVICIO EXISTENTE ***
     fun completeWithReceipt(id: Long, paymentMethod: String?, additionalNotes: String?): ReceiptResponse {
         val sale = saleRepository.findById(id)
             .orElseThrow {
@@ -211,7 +201,6 @@ class SaleServiceImpl(
                 )
             }
 
-        // Verificar que la venta tenga detalles
         val saleDetails = saleDetailRepository.findBySaleId(id)
         if (saleDetails.isEmpty()) {
             throw BusinessValidationException(
@@ -220,7 +209,6 @@ class SaleServiceImpl(
             )
         }
 
-        // Verificar que no tenga ya un recibo
         val existingReceipt = receiptService.findBySaleId(id)
         if (existingReceipt != null) {
             throw DuplicateResourceException(
@@ -231,10 +219,8 @@ class SaleServiceImpl(
             )
         }
 
-        // Generar número de recibo automático
         val receiptNumber = receiptService.generateReceiptNumber(sale.store.id)
 
-        // Crear request para el recibo
         val receiptRequest = ReceiptRequest(
             receiptNumber = receiptNumber,
             userId = sale.user.id,
@@ -259,7 +245,6 @@ class SaleServiceImpl(
             )
         }
 
-        // Validar porcentajes
         if (request.discountPercentage < BigDecimal.ZERO || request.discountPercentage > BigDecimal(100)) {
             throw BusinessValidationException(
                 message = "El porcentaje de descuento debe estar entre 0 y 100",
@@ -274,7 +259,6 @@ class SaleServiceImpl(
             )
         }
 
-        // Validar montos
         if (request.discountAmount < BigDecimal.ZERO) {
             throw BusinessValidationException(
                 message = "El monto de descuento no puede ser negativo",

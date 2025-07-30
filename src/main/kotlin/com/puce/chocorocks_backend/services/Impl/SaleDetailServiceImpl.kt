@@ -38,10 +38,8 @@ class SaleDetailServiceImpl(
     }
 
     override fun save(request: SaleDetailRequest): SaleDetailResponse {
-        // Validaciones de cantidad
         ValidationUtils.validatePositiveQuantity(request.quantity, "cantidad")
 
-        // Validar que la venta existe
         val sale = saleRepository.findById(request.saleId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -51,7 +49,6 @@ class SaleDetailServiceImpl(
                 )
             }
 
-        // Validar que el producto existe
         val product = productRepository.findById(request.productId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -61,7 +58,6 @@ class SaleDetailServiceImpl(
                 )
             }
 
-        // Validar que el lote existe si se proporciona
         val batch = request.batchId?.let {
             val productBatch = productBatchRepository.findById(it)
                 .orElseThrow {
@@ -72,10 +68,8 @@ class SaleDetailServiceImpl(
                     )
                 }
 
-            // Validar que el lote no esté expirado
             ValidationUtils.validateBatchNotExpired(productBatch.expirationDate, productBatch.batchCode)
 
-            // Validar stock suficiente en el lote
             ValidationUtils.validateSufficientStock(
                 available = productBatch.currentQuantity,
                 requested = request.quantity,
@@ -85,19 +79,16 @@ class SaleDetailServiceImpl(
             productBatch
         }
 
-        // Calcular precio unitario según tipo de venta
         val unitPrice = when (sale.saleType) {
             SaleType.RETAIL -> product.retailPrice
             SaleType.WHOLESALE -> product.wholesalePrice
         }
 
-        // Calcular subtotal
         val subtotal = unitPrice * BigDecimal(request.quantity)
 
         val saleDetail = SaleDetailMapper.toEntity(request, sale, product, batch, unitPrice, subtotal)
         val savedSaleDetail = saleDetailRepository.save(saleDetail)
 
-        // Recalcular totales de la venta
         recalculateSaleTotals(sale.id)
 
         return SaleDetailMapper.toResponse(savedSaleDetail)
@@ -113,7 +104,6 @@ class SaleDetailServiceImpl(
                 )
             }
 
-        // Validaciones similares al save
         ValidationUtils.validatePositiveQuantity(request.quantity, "cantidad")
 
         val sale = saleRepository.findById(request.saleId)

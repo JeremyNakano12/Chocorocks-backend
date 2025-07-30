@@ -34,10 +34,8 @@ class StoreServiceImpl(
     }
 
     override fun save(request: StoreRequest): StoreResponse {
-        // Validaciones de negocio básicas
         validateStoreData(request)
 
-        // Validar nombre único
         val nameExists = storeRepository.existsByName(request.name)
         if (nameExists) {
             throw DuplicateResourceException(
@@ -48,7 +46,6 @@ class StoreServiceImpl(
             )
         }
 
-        // Validar que el manager existe si se proporciona
         val manager = request.managerId?.let {
             userRepository.findById(it)
                 .orElseThrow {
@@ -60,7 +57,6 @@ class StoreServiceImpl(
                 }
         }
 
-        // Validar horarios si se proporcionan
         validateSchedule(request)
 
         val store = StoreMapper.toEntity(request, manager)
@@ -78,10 +74,8 @@ class StoreServiceImpl(
                 )
             }
 
-        // Validaciones de negocio básicas
         validateStoreData(request)
 
-        // Validar nombre único (excluyendo la tienda actual)
         val nameExists = storeRepository.findAll()
             .any { it.name == request.name && it.id != id }
         if (nameExists) {
@@ -93,7 +87,6 @@ class StoreServiceImpl(
             )
         }
 
-        // Validar manager
         val manager = request.managerId?.let {
             userRepository.findById(it)
                 .orElseThrow {
@@ -158,7 +151,6 @@ class StoreServiceImpl(
             )
         }
 
-        // Validar formato de teléfono si se proporciona
         request.phoneNumber?.let { phone ->
             if (phone.isNotBlank() && phone.length < 7) {
                 throw BusinessValidationException(
@@ -182,7 +174,6 @@ class StoreServiceImpl(
             }
         }
 
-        // Validar que si se proporciona una hora, se proporcione la otra
         if ((openTime != null && closeTime == null) || (openTime == null && closeTime != null)) {
             throw BusinessValidationException(
                 message = "Debe proporcionar tanto la hora de apertura como la de cierre",

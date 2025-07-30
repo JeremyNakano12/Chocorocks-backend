@@ -38,11 +38,9 @@ class InventoryMovementServiceImpl(
     }
 
     override fun save(request: InventoryMovementRequest): InventoryMovementResponse {
-        // Validaciones básicas
         ValidationUtils.validatePositiveQuantity(request.quantity, "cantidad")
         validateMovementData(request)
 
-        // Validar que el producto existe
         val product = productRepository.findById(request.productId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -52,7 +50,6 @@ class InventoryMovementServiceImpl(
                 )
             }
 
-        // Validar que el lote existe si se proporciona
         val batch = request.batchId?.let {
             val productBatch = productBatchRepository.findById(it)
                 .orElseThrow {
@@ -63,7 +60,6 @@ class InventoryMovementServiceImpl(
                     )
                 }
 
-            // Validar que el lote pertenece al producto
             if (productBatch.product.id != request.productId) {
                 throw BusinessValidationException(
                     message = "El lote seleccionado no pertenece al producto",
@@ -74,10 +70,8 @@ class InventoryMovementServiceImpl(
             productBatch
         }
 
-        // Validar tiendas según el tipo de movimiento
         val (fromStore, toStore) = validateStoresForMovement(request)
 
-        // Validar que el usuario existe
         val user = userRepository.findById(request.userId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -87,7 +81,6 @@ class InventoryMovementServiceImpl(
                 )
             }
 
-        // Validaciones específicas según el tipo de movimiento
         validateMovementLogic(request, product, batch)
 
         val movement = InventoryMovementMapper.toEntity(request, product, batch, fromStore, toStore, user)
@@ -105,7 +98,6 @@ class InventoryMovementServiceImpl(
                 )
             }
 
-        // Validaciones similares al save
         ValidationUtils.validatePositiveQuantity(request.quantity, "cantidad")
         validateMovementData(request)
 
@@ -170,7 +162,6 @@ class InventoryMovementServiceImpl(
                 )
             }
 
-        // Solo permitir eliminar movimientos de ajuste
         if (movement.reason != MovementReason.ADJUSTMENT) {
             throw InvalidOperationException(
                 operation = "eliminar el movimiento de inventario",
@@ -183,7 +174,6 @@ class InventoryMovementServiceImpl(
     }
 
     private fun validateMovementData(request: InventoryMovementRequest) {
-        // Validar que la descripción no esté vacía si es requerida
         when (request.reason) {
             MovementReason.ADJUSTMENT, MovementReason.DAMAGE -> {
                 if (request.notes.isNullOrBlank()) {
@@ -193,7 +183,7 @@ class InventoryMovementServiceImpl(
                     )
                 }
             }
-            else -> {} // Otros tipos no requieren notas obligatorias
+            else -> {}
         }
     }
 
@@ -220,7 +210,6 @@ class InventoryMovementServiceImpl(
                 }
         }
 
-        // Validaciones según el tipo de movimiento
         when (request.movementType) {
             MovementType.TRANSFER -> {
                 if (fromStore == null || toStore == null) {
@@ -262,7 +251,6 @@ class InventoryMovementServiceImpl(
         product: Product,
         batch: ProductBatch?
     ) {
-        // Validar stock suficiente para movimientos de salida
         if (request.movementType == MovementType.OUT || request.movementType == MovementType.TRANSFER) {
             batch?.let {
                 ValidationUtils.validateSufficientStock(
@@ -273,7 +261,6 @@ class InventoryMovementServiceImpl(
             }
         }
 
-        // Validar que el lote no esté expirado para movimientos de salida
         if (request.movementType == MovementType.OUT || request.movementType == MovementType.TRANSFER) {
             batch?.let {
                 ValidationUtils.validateBatchNotExpired(it.expirationDate, it.batchCode)

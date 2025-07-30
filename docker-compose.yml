@@ -12,11 +12,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: admin
       MAIL_HOST: smtp.gmail.com
       MAIL_PORT: 587
-      MAIL_USERNAME: ${MAIL_USERNAME:placeholder}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:placeholder}
+      MAIL_USERNAME: ${MAIL_USERNAME:-MailUsername}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-MailPassword}
 
       COMPANY_NAME: ${COMPANY_NAME:-Chocorocks}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:-soporte@chocorocks.com}
+
+      SUPABASE_URL: ${SUPABASE_URL:-SupabaseURL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-SupabaseAnonKey}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-Secret}
+
     restart: unless-stopped
 
   postgres:

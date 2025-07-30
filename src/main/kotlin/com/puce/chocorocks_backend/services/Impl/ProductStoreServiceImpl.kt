@@ -35,7 +35,6 @@ class ProductStoreServiceImpl(
     }
 
     override fun save(request: ProductStoreRequest): ProductStoreResponse {
-        // Validaciones de cantidades
         if (request.currentStock < 0) {
             throw InvalidQuantityException(
                 field = "stock actual",
@@ -52,7 +51,6 @@ class ProductStoreServiceImpl(
             )
         }
 
-        // Validar que el producto existe
         val product = productRepository.findById(request.productId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -62,7 +60,6 @@ class ProductStoreServiceImpl(
                 )
             }
 
-        // Validar que la tienda existe
         val store = storeRepository.findById(request.storeId)
             .orElseThrow {
                 ResourceNotFoundException(
@@ -72,7 +69,6 @@ class ProductStoreServiceImpl(
                 )
             }
 
-        // Validar que no exista ya la relación producto-tienda
         val relationExists = productStoreRepository.existsByProductIdAndStoreId(
             request.productId,
             request.storeId
@@ -101,7 +97,6 @@ class ProductStoreServiceImpl(
                 )
             }
 
-        // Validaciones similares al save
         if (request.currentStock < 0) {
             throw InvalidQuantityException(
                 field = "stock actual",
@@ -136,7 +131,6 @@ class ProductStoreServiceImpl(
                 )
             }
 
-        // Validar que no exista la relación con otros registros (excluyendo el actual)
         val relationExists = productStoreRepository.findAll()
             .any {
                 it.product.id == request.productId &&
