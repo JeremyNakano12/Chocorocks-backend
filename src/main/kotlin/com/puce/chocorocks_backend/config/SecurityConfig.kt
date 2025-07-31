@@ -30,9 +30,9 @@ class SecurityConfig(
             .authorizeHttpRequests { auth ->
                 auth
                     // Endpoints públicos
-                    .requestMatchers("/actuator/**").permitAll()
-                    .requestMatchers("/health/**").permitAll()
-                    .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                    .requestMatchers("/").permitAll()
+                    .requestMatchers("/health").permitAll()
+                    .requestMatchers("/api-info").permitAll()
 
                     // Endpoints de solo lectura - pueden acceder EMPLOYEE y ADMIN
                     .requestMatchers(HttpMethod.GET, "/chocorocks/api/**").hasAnyRole("EMPLOYEE", "ADMIN")
