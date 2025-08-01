@@ -40,6 +40,7 @@ dependencies {
 	implementation("io.jsonwebtoken:jjwt-impl:0.12.3")
 	implementation("io.jsonwebtoken:jjwt-jackson:0.12.3")
 	implementation("com.squareup.okhttp3:okhttp:4.12.0")
+	implementation("org.springframework.security:spring-security-oauth2-jose")
 }
 
 kotlin {

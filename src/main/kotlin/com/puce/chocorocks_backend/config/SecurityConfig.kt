@@ -13,6 +13,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry
+
 
 @Configuration
 @EnableWebSecurity
@@ -42,6 +44,19 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.PUT, "/chocorocks/api/**").hasAnyRole("EMPLOYEE", "ADMIN")
                     .requestMatchers(HttpMethod.PATCH, "/chocorocks/api/**").hasAnyRole("EMPLOYEE", "ADMIN")
 
+                    // Reportes básicos - EMPLOYEE y ADMIN pueden ver
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/sales/**").hasAnyRole("EMPLOYEE", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/inventory/**").hasAnyRole("EMPLOYEE", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/best-selling-products/**").hasAnyRole("EMPLOYEE", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/traceability/**").hasAnyRole("EMPLOYEE", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/summary/**").hasAnyRole("EMPLOYEE", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/periods").hasAnyRole("EMPLOYEE", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/filters").hasAnyRole("EMPLOYEE", "ADMIN")
+
+                    // Reportes ejecutivos y rentabilidad - solo ADMIN
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/profitability/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/chocorocks/api/reports/executive-dashboard/**").hasRole("ADMIN")
+
                     // Operaciones de eliminación - solo ADMIN
                     .requestMatchers(HttpMethod.DELETE, "/chocorocks/api/**").hasRole("ADMIN")
 
@@ -49,6 +64,7 @@ class SecurityConfig(
                     .requestMatchers("/chocorocks/api/users/**").hasRole("ADMIN")
                     .requestMatchers("/chocorocks/api/stores/**/delete").hasRole("ADMIN")
                     .requestMatchers("/chocorocks/api/categories/**/delete").hasRole("ADMIN")
+                    .requestMatchers("/chocorocks/api/user-activities/**").hasRole("ADMIN")
 
                     .anyRequest().authenticated()
             }
