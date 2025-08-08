@@ -6,6 +6,7 @@ import com.puce.chocorocks_backend.mappers.*
 import com.puce.chocorocks_backend.repositories.*
 import com.puce.chocorocks_backend.services.*
 import com.puce.chocorocks_backend.models.entities.*
+import com.puce.chocorocks_backend.utils.UserActivityHelper
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,7 +23,9 @@ class SaleDetailServiceImpl(
     private val productBatchRepository: ProductBatchRepository,
     private val productStoreRepository: ProductStoreRepository,
     private val inventoryMovementService: InventoryMovementService,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val userActivityService: UserActivityService,
+    private val userActivityHelper: UserActivityHelper
 ) : SaleDetailService {
 
     override fun findAll(): List<SaleDetailResponse> =
@@ -92,10 +95,29 @@ class SaleDetailServiceImpl(
         val saleDetail = SaleDetailMapper.toEntity(request, sale, product, batch, unitPrice, subtotal)
         val savedSaleDetail = saleDetailRepository.save(saleDetail)
 
-        // Actualiza el stock después de crear el detalle
         updateStockAfterSale(savedSaleDetail)
 
         recalculateSaleTotals(sale.id)
+
+        try {
+            val batchInfo = batch?.let { " del lote '${it.batchCode}'" } ?: ""
+            val saleTypeInfo = when (sale.saleType) {
+                SaleType.RETAIL -> "al por menor"
+                SaleType.WHOLESALE -> "al por mayor"
+            }
+
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "CREATE",
+                tableName = "sale_details",
+                recordId = savedSaleDetail.id,
+                description = "Agregó ${request.quantity} unidades de '${product.nameProduct}'$batchInfo a venta ${sale.saleNumber} ($saleTypeInfo) - Precio unitario: $${unitPrice}, Subtotal: $${subtotal}"
+            )
+            userActivityService.save(activityRequest)
+
+            println("✅ Actividad registrada: Usuario ${userActivityHelper.getCurrentUserEmail()} agregó ${request.quantity} ${product.nameProduct} a venta ${sale.saleNumber}")
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
 
         return SaleDetailMapper.toResponse(savedSaleDetail)
     }
@@ -159,7 +181,10 @@ class SaleDetailServiceImpl(
 
         val subtotal = unitPrice * BigDecimal(request.quantity)
 
-        // Ajusta el stock antes de actualizar
+        val oldQuantity = existingSaleDetail.quantity
+        val oldSubtotal = existingSaleDetail.subtotal
+        val oldProduct = existingSaleDetail.product.nameProduct
+
         val quantityDifference = request.quantity - existingSaleDetail.quantity
         if (quantityDifference != 0) {
             updateStockAfterQuantityChange(existingSaleDetail, quantityDifference)
@@ -178,6 +203,35 @@ class SaleDetailServiceImpl(
 
         recalculateSaleTotals(sale.id)
 
+        try {
+            val changes = mutableListOf<String>()
+
+            if (oldProduct != product.nameProduct) {
+                changes.add("Producto: '$oldProduct' → '${product.nameProduct}'")
+            }
+
+            if (oldQuantity != request.quantity) {
+                changes.add("Cantidad: $oldQuantity → ${request.quantity}")
+            }
+
+            if (oldSubtotal != subtotal) {
+                changes.add("Subtotal: $${oldSubtotal} → $${subtotal}")
+            }
+
+            val batchInfo = batch?.let { " del lote '${it.batchCode}'" } ?: ""
+            val changesText = if (changes.isNotEmpty()) " (${changes.joinToString(", ")})" else ""
+
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "UPDATE",
+                tableName = "sale_details",
+                recordId = savedSaleDetail.id,
+                description = "Actualizó detalle de '${product.nameProduct}'$batchInfo en venta ${sale.saleNumber}$changesText"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         return SaleDetailMapper.toResponse(savedSaleDetail)
     }
 
@@ -192,6 +246,19 @@ class SaleDetailServiceImpl(
             }
 
         val saleId = saleDetail.sale.id
+
+        try {
+            val batchInfo = saleDetail.batch?.let { " del lote '${it.batchCode}'" } ?: ""
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "DELETE",
+                tableName = "sale_details",
+                recordId = saleDetail.id,
+                description = "Eliminó ${saleDetail.quantity} unidades de '${saleDetail.product.nameProduct}'$batchInfo de venta ${saleDetail.sale.saleNumber} (Subtotal eliminado: $${saleDetail.subtotal})"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
 
         restoreStockAfterDelete(saleDetail)
 
@@ -237,7 +304,6 @@ class SaleDetailServiceImpl(
     }
 
     private fun updateStockAfterQuantityChange(saleDetail: SaleDetail, quantityDifference: Int) {
-
         saleDetail.batch?.let { batch ->
             val updatedBatch = ProductBatch(
                 batchCode = batch.batchCode,
@@ -278,6 +344,7 @@ class SaleDetailServiceImpl(
     }
 
     private fun restoreStockAfterDelete(saleDetail: SaleDetail) {
+        // Restaurar stock del lote si existe
         saleDetail.batch?.let { batch ->
             val updatedBatch = ProductBatch(
                 batchCode = batch.batchCode,
@@ -294,6 +361,7 @@ class SaleDetailServiceImpl(
             productBatchRepository.save(updatedBatch)
         }
 
+        // Restaurar stock de la tienda
         val productStore = productStoreRepository.findByProductIdAndStoreId(
             saleDetail.product.id,
             saleDetail.sale.store.id

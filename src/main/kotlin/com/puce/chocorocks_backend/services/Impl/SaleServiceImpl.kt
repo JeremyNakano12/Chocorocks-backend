@@ -6,6 +6,7 @@ import com.puce.chocorocks_backend.mappers.*
 import com.puce.chocorocks_backend.repositories.*
 import com.puce.chocorocks_backend.services.*
 import com.puce.chocorocks_backend.models.entities.*
+import com.puce.chocorocks_backend.utils.UserActivityHelper
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,7 +21,9 @@ class SaleServiceImpl(
     private val clientRepository: ClientRepository,
     private val storeRepository: StoreRepository,
     private val saleDetailRepository: SaleDetailRepository,
-    private val receiptService: ReceiptService
+    private val receiptService: ReceiptService,
+    private val userActivityService: UserActivityService,
+    private val userActivityHelper: UserActivityHelper
 ) : SaleService {
 
     override fun findAll(): List<SaleResponse> =
@@ -86,6 +89,22 @@ class SaleServiceImpl(
         recalculateSaleTotals(savedSale.id)
 
         val finalSale = saleRepository.findById(savedSale.id).get()
+
+        try {
+            val clientInfo = client?.let { " para cliente ${it.nameLastname}" } ?: ""
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "CREATE",
+                tableName = "sales",
+                recordId = finalSale.id,
+                description = "Creó venta ${finalSale.saleNumber} por $${finalSale.totalAmount} en tienda ${store.name}$clientInfo"
+            )
+            userActivityService.save(activityRequest)
+
+            println("✅ Actividad registrada: Usuario ${userActivityHelper.getCurrentUserEmail()} creó venta ${finalSale.saleNumber}")
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         return SaleMapper.toResponse(finalSale)
     }
 
@@ -140,6 +159,9 @@ class SaleServiceImpl(
                 )
             }
 
+        val oldTotal = existingSale.totalAmount
+        val oldClient = existingSale.client?.nameLastname
+
         val updatedSale = Sale(
             saleNumber = request.saleNumber,
             user = user,
@@ -158,9 +180,37 @@ class SaleServiceImpl(
         ).apply { this.id = existingSale.id }
 
         val savedSale = saleRepository.save(updatedSale)
+
         recalculateSaleTotals(savedSale.id)
 
         val finalSale = saleRepository.findById(savedSale.id).get()
+
+        try {
+            val changes = mutableListOf<String>()
+
+            if (oldTotal != finalSale.totalAmount) {
+                changes.add("Total: $${oldTotal} → $${finalSale.totalAmount}")
+            }
+
+            if (oldClient != client?.nameLastname) {
+                val oldClientText = oldClient ?: "Sin cliente"
+                val newClientText = client?.nameLastname ?: "Sin cliente"
+                changes.add("Cliente: $oldClientText → $newClientText")
+            }
+
+            val changesText = if (changes.isNotEmpty()) " (${changes.joinToString(", ")})" else ""
+
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "UPDATE",
+                tableName = "sales",
+                recordId = finalSale.id,
+                description = "Actualizó venta ${finalSale.saleNumber} en tienda ${store.name}$changesText"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         return SaleMapper.toResponse(finalSale)
     }
 
@@ -191,6 +241,18 @@ class SaleServiceImpl(
             )
         }
 
+        try {
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "DELETE",
+                tableName = "sales",
+                recordId = sale.id,
+                description = "Eliminó venta ${sale.saleNumber} (Total: $${sale.totalAmount}) de tienda ${sale.store.name}"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         saleRepository.deleteById(id)
     }
 
@@ -217,7 +279,21 @@ class SaleServiceImpl(
             customerIdentification = sale.client?.identificationNumber
         )
 
-        return receiptService.save(receiptRequest)
+        val receipt = receiptService.save(receiptRequest)
+
+        try {
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "CREATE",
+                tableName = "receipts",
+                recordId = receipt.id,
+                description = "Generó recibo ${receipt.receiptNumber} para venta ${sale.saleNumber} (Total: $${sale.totalAmount})"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
+        return receipt
     }
 
     private fun validateSaleData(request: SaleRequest) {

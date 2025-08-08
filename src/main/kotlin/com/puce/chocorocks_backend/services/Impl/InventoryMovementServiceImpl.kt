@@ -6,6 +6,7 @@ import com.puce.chocorocks_backend.mappers.*
 import com.puce.chocorocks_backend.repositories.*
 import com.puce.chocorocks_backend.services.*
 import com.puce.chocorocks_backend.models.entities.*
+import com.puce.chocorocks_backend.utils.UserActivityHelper
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -19,7 +20,9 @@ class InventoryMovementServiceImpl(
     private val productRepository: ProductRepository,
     private val productBatchRepository: ProductBatchRepository,
     private val storeRepository: StoreRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val userActivityService: UserActivityService,
+    private val userActivityHelper: UserActivityHelper
 ) : InventoryMovementService {
 
     override fun findAll(): List<InventoryMovementResponse> =
@@ -60,10 +63,11 @@ class InventoryMovementServiceImpl(
                     )
                 }
 
-            if (productBatch.product.id != request.productId) {
-                throw BusinessValidationException(
-                    message = "El lote seleccionado no pertenece al producto",
-                    detalles = listOf("Lote: ${productBatch.batchCode}, Producto: ${product.nameProduct}")
+            if (request.movementType == MovementType.OUT) {
+                ValidationUtils.validateSufficientStock(
+                    available = productBatch.currentQuantity,
+                    requested = request.quantity,
+                    productName = product.nameProduct
                 )
             }
 
@@ -81,10 +85,52 @@ class InventoryMovementServiceImpl(
                 )
             }
 
-        validateMovementLogic(request, product, batch)
-
         val movement = InventoryMovementMapper.toEntity(request, product, batch, fromStore, toStore, user)
         val savedMovement = inventoryMovementRepository.save(movement)
+
+        try {
+            val movementTypeText = when (request.movementType) {
+                MovementType.IN -> "entrada"
+                MovementType.OUT -> "salida"
+                MovementType.TRANSFER -> "transferencia"
+            }
+
+            val reasonText = when (request.reason) {
+                MovementReason.PRODUCTION -> "producción"
+                MovementReason.SALE -> "venta"
+                MovementReason.TRANSFER -> "transferencia"
+                MovementReason.ADJUSTMENT -> "ajuste"
+                MovementReason.DAMAGE -> "daño"
+                MovementReason.EXPIRED -> "vencimiento"
+            }
+
+            val batchInfo = batch?.let { " del lote '${it.batchCode}'" } ?: ""
+
+            val storeInfo = when (request.movementType) {
+                MovementType.IN -> toStore?.let { " hacia tienda '${it.name}'" } ?: ""
+                MovementType.OUT -> fromStore?.let { " desde tienda '${it.name}'" } ?: ""
+                MovementType.TRANSFER -> {
+                    val from = fromStore?.name ?: "Unknown"
+                    val to = toStore?.name ?: "Unknown"
+                    " de '$from' a '$to'"
+                }
+            }
+
+            val referenceInfo = request.referenceId?.let { " (Ref: ${request.referenceType}-${it})" } ?: ""
+
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "CREATE",
+                tableName = "inventory_movements",
+                recordId = savedMovement.id,
+                description = "Registró $movementTypeText de ${request.quantity} unidades de '${product.nameProduct}'$batchInfo$storeInfo por $reasonText$referenceInfo"
+            )
+            userActivityService.save(activityRequest)
+
+            println("✅ Actividad registrada: Usuario ${userActivityHelper.getCurrentUserEmail()} registró movimiento de inventario para ${product.nameProduct}")
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         return InventoryMovementMapper.toResponse(savedMovement)
     }
 
@@ -132,7 +178,8 @@ class InventoryMovementServiceImpl(
                 )
             }
 
-        validateMovementLogic(request, product, batch)
+        val oldQuantity = existingMovement.quantity
+        val oldReason = existingMovement.reason
 
         val updatedMovement = InventoryMovement(
             movementType = request.movementType,
@@ -149,6 +196,31 @@ class InventoryMovementServiceImpl(
         ).apply { this.id = existingMovement.id }
 
         val savedMovement = inventoryMovementRepository.save(updatedMovement)
+
+        try {
+            val changes = mutableListOf<String>()
+
+            if (oldQuantity != request.quantity) {
+                changes.add("Cantidad: $oldQuantity → ${request.quantity}")
+            }
+
+            if (oldReason != request.reason) {
+                changes.add("Razón: ${oldReason.name} → ${request.reason.name}")
+            }
+
+            val changesText = if (changes.isNotEmpty()) " (${changes.joinToString(", ")})" else ""
+
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "UPDATE",
+                tableName = "inventory_movements",
+                recordId = savedMovement.id,
+                description = "Actualizó movimiento de inventario para '${product.nameProduct}'$changesText"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         return InventoryMovementMapper.toResponse(savedMovement)
     }
 
@@ -170,6 +242,26 @@ class InventoryMovementServiceImpl(
             )
         }
 
+        try {
+            val movementTypeText = when (movement.movementType) {
+                MovementType.IN -> "entrada"
+                MovementType.OUT -> "salida"
+                MovementType.TRANSFER -> "transferencia"
+            }
+
+            val batchInfo = movement.batch?.let { " del lote '${it.batchCode}'" } ?: ""
+
+            val activityRequest = userActivityHelper.createActivityRequest(
+                actionType = "DELETE",
+                tableName = "inventory_movements",
+                recordId = movement.id,
+                description = "Eliminó movimiento de $movementTypeText de ${movement.quantity} unidades de '${movement.product.nameProduct}'$batchInfo (Razón: ${movement.reason.name})"
+            )
+            userActivityService.save(activityRequest)
+        } catch (e: Exception) {
+            println("❌ Error logging user activity: ${e.message}")
+        }
+
         inventoryMovementRepository.deleteById(id)
     }
 
@@ -184,6 +276,39 @@ class InventoryMovementServiceImpl(
                 }
             }
             else -> {}
+        }
+
+        when (request.movementType) {
+            MovementType.TRANSFER -> {
+                if (request.fromStoreId == null || request.toStoreId == null) {
+                    throw BusinessValidationException(
+                        message = "Para transferencias se requieren tienda origen y destino",
+                        detalles = listOf("Especifique ambas tiendas para la transferencia")
+                    )
+                }
+                if (request.fromStoreId == request.toStoreId) {
+                    throw BusinessValidationException(
+                        message = "La tienda origen y destino no pueden ser la misma",
+                        detalles = listOf("Seleccione tiendas diferentes para la transferencia")
+                    )
+                }
+            }
+            MovementType.IN -> {
+                if (request.toStoreId == null) {
+                    throw BusinessValidationException(
+                        message = "Para entradas se requiere especificar la tienda destino",
+                        detalles = listOf("Seleccione la tienda donde ingresa el producto")
+                    )
+                }
+            }
+            MovementType.OUT -> {
+                if (request.fromStoreId == null) {
+                    throw BusinessValidationException(
+                        message = "Para salidas se requiere especificar la tienda origen",
+                        detalles = listOf("Seleccione la tienda desde donde sale el producto")
+                    )
+                }
+            }
         }
     }
 
@@ -210,61 +335,6 @@ class InventoryMovementServiceImpl(
                 }
         }
 
-        when (request.movementType) {
-            MovementType.TRANSFER -> {
-                if (fromStore == null || toStore == null) {
-                    throw BusinessValidationException(
-                        message = "Los movimientos de transferencia requieren tienda origen y destino",
-                        detalles = listOf("Seleccione ambas tiendas para la transferencia")
-                    )
-                }
-                if (fromStore.id == toStore.id) {
-                    throw BusinessValidationException(
-                        message = "La tienda origen y destino no pueden ser la misma",
-                        detalles = listOf("Seleccione tiendas diferentes para la transferencia")
-                    )
-                }
-            }
-            MovementType.IN -> {
-                if (toStore == null) {
-                    throw BusinessValidationException(
-                        message = "Los movimientos de entrada requieren tienda destino",
-                        detalles = listOf("Seleccione la tienda donde ingresa el producto")
-                    )
-                }
-            }
-            MovementType.OUT -> {
-                if (fromStore == null) {
-                    throw BusinessValidationException(
-                        message = "Los movimientos de salida requieren tienda origen",
-                        detalles = listOf("Seleccione la tienda de donde sale el producto")
-                    )
-                }
-            }
-        }
-
         return Pair(fromStore, toStore)
-    }
-
-    private fun validateMovementLogic(
-        request: InventoryMovementRequest,
-        product: Product,
-        batch: ProductBatch?
-    ) {
-        if (request.movementType == MovementType.OUT || request.movementType == MovementType.TRANSFER) {
-            batch?.let {
-                ValidationUtils.validateSufficientStock(
-                    available = it.currentQuantity,
-                    requested = request.quantity,
-                    productName = product.nameProduct
-                )
-            }
-        }
-
-        if (request.movementType == MovementType.OUT || request.movementType == MovementType.TRANSFER) {
-            batch?.let {
-                ValidationUtils.validateBatchNotExpired(it.expirationDate, it.batchCode)
-            }
-        }
     }
 }
