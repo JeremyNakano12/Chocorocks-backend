@@ -135,6 +135,7 @@ class SaleDetailServiceImpl(
                 }
 
             ValidationUtils.validateBatchNotExpired(productBatch.expirationDate, productBatch.batchCode)
+
             ValidationUtils.validateSufficientStock(
                 available = productBatch.currentQuantity,
                 requested = request.quantity,
@@ -186,7 +187,14 @@ class SaleDetailServiceImpl(
 
         val saleDetails = saleDetailRepository.findBySaleId(saleId)
         val subtotal = saleDetails.sumOf { it.subtotal }
-        val totalWithDiscount = subtotal - sale.discountAmount
+
+        val discountAmount = if (sale.discountPercentage > BigDecimal.ZERO) {
+            subtotal * sale.discountPercentage / BigDecimal(100)
+        } else {
+            sale.discountAmount
+        }
+
+        val totalWithDiscount = subtotal - discountAmount
         val taxAmount = totalWithDiscount * sale.taxPercentage / BigDecimal(100)
         val totalAmount = totalWithDiscount + taxAmount
 
@@ -198,7 +206,7 @@ class SaleDetailServiceImpl(
             saleType = sale.saleType,
             subtotal = subtotal,
             discountPercentage = sale.discountPercentage,
-            discountAmount = sale.discountAmount,
+            discountAmount = discountAmount,
             taxPercentage = sale.taxPercentage,
             taxAmount = taxAmount,
             totalAmount = totalAmount,

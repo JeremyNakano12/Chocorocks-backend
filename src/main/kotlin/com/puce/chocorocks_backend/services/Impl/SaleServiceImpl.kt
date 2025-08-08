@@ -82,7 +82,11 @@ class SaleServiceImpl(
 
         val sale = SaleMapper.toEntity(request, user, client, store)
         val savedSale = saleRepository.save(sale)
-        return SaleMapper.toResponse(savedSale)
+
+        recalculateSaleTotals(savedSale.id)
+
+        val finalSale = saleRepository.findById(savedSale.id).get()
+        return SaleMapper.toResponse(finalSale)
     }
 
     override fun update(id: Long, request: SaleRequest): SaleResponse {
@@ -97,9 +101,8 @@ class SaleServiceImpl(
 
         validateSaleData(request)
 
-        val saleNumberExists = saleRepository.findAll()
-            .any { it.saleNumber == request.saleNumber && it.id != id }
-        if (saleNumberExists) {
+        val saleNumberExists = saleRepository.existsBySaleNumber(request.saleNumber)
+        if (saleNumberExists && existingSale.saleNumber != request.saleNumber) {
             throw DuplicateResourceException(
                 resourceName = "Venta",
                 field = "número",
@@ -197,32 +200,12 @@ class SaleServiceImpl(
                 ResourceNotFoundException(
                     resourceName = "Venta",
                     identifier = id,
-                    detalles = listOf("Venta no encontrada para generar recibo")
+                    detalles = listOf("No se puede completar una venta que no existe")
                 )
             }
 
-        val saleDetails = saleDetailRepository.findBySaleId(id)
-        if (saleDetails.isEmpty()) {
-            throw BusinessValidationException(
-                message = "No se puede generar recibo para una venta sin productos",
-                detalles = listOf("Agregue productos a la venta antes de generar el recibo")
-            )
-        }
-
-        val existingReceipt = receiptService.findBySaleId(id)
-        if (existingReceipt != null) {
-            throw DuplicateResourceException(
-                resourceName = "Recibo",
-                field = "venta",
-                value = id,
-                detalles = listOf("La venta ya tiene un recibo: ${existingReceipt.receiptNumber}")
-            )
-        }
-
-        val receiptNumber = receiptService.generateReceiptNumber(sale.store.id)
-
         val receiptRequest = ReceiptRequest(
-            receiptNumber = receiptNumber,
+            receiptNumber = "REC-${sale.saleNumber}",
             userId = sale.user.id,
             clientId = sale.client?.id,
             saleId = sale.id,
@@ -272,7 +255,14 @@ class SaleServiceImpl(
 
         val saleDetails = saleDetailRepository.findBySaleId(saleId)
         val subtotal = saleDetails.sumOf { it.subtotal }
-        val totalWithDiscount = subtotal - sale.discountAmount
+
+        val discountAmount = if (sale.discountPercentage > BigDecimal.ZERO) {
+            subtotal * sale.discountPercentage / BigDecimal(100)
+        } else {
+            sale.discountAmount
+        }
+
+        val totalWithDiscount = subtotal - discountAmount
         val taxAmount = totalWithDiscount * sale.taxPercentage / BigDecimal(100)
         val totalAmount = totalWithDiscount + taxAmount
 
@@ -284,7 +274,7 @@ class SaleServiceImpl(
             saleType = sale.saleType,
             subtotal = subtotal,
             discountPercentage = sale.discountPercentage,
-            discountAmount = sale.discountAmount,
+            discountAmount = discountAmount,
             taxPercentage = sale.taxPercentage,
             taxAmount = taxAmount,
             totalAmount = totalAmount,
