@@ -13,5 +13,6 @@ data class StoreResponse(
     val phoneNumber: String?,
     val scheduleOpen: LocalTime?,
     val scheduleClosed: LocalTime?,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val createdAt: LocalDateTime
 )

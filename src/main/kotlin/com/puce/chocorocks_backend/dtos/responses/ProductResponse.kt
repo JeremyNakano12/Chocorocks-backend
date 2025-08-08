@@ -17,5 +17,7 @@ data class ProductResponse(
     val minStockLevel: Int,
     val imageUrl: String?,
     val barcode: String?,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val createdAt: LocalDateTime,
+
 )

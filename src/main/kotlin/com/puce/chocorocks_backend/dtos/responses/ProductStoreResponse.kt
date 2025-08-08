@@ -10,5 +10,6 @@ data class ProductStoreResponse(
     val store: StoreResponse,
     val currentStock: Int,
     val minStockLevel: Int,
-    val lastUpdated: LocalDateTime
+    val lastUpdated: LocalDateTime,
+    val createdAt: LocalDateTime
 )

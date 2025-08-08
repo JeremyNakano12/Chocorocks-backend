@@ -23,5 +23,6 @@ data class ReceiptResponse(
     val customerName: String?,
     val customerIdentification: String?,
     val isPrinted: Boolean,
-    val printCount: Int
+    val printCount: Int,
+    val createdAt: LocalDateTime
 )

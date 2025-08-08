@@ -21,7 +21,8 @@ object ProductStoreMapper {
             store = StoreMapper.toResponse(entity.store),
             currentStock = entity.currentStock,
             minStockLevel = entity.minStockLevel,
-            lastUpdated = entity.lastUpdated
+            lastUpdated = entity.lastUpdated,
+            createdAt = entity.createdAt
         )
     }
 }

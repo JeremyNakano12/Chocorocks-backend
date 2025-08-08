@@ -32,7 +32,8 @@ object SaleDetailMapper {
             batch = entity.batch?.let { ProductBatchMapper.toResponse(it) },
             quantity = entity.quantity,
             unitPrice = entity.unitPrice,
-            subtotal = entity.subtotal
+            subtotal = entity.subtotal,
+            createdAt = entity.createdAt
         )
     }
 }

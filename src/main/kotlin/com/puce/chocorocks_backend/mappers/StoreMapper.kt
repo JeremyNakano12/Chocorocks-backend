@@ -28,7 +28,8 @@ object StoreMapper {
             phoneNumber = entity.phoneNumber,
             scheduleOpen = entity.scheduleOpen,
             scheduleClosed = entity.scheduleClosed,
-            isActive = entity.isActive
+            isActive = entity.isActive,
+            createdAt = entity.createdAt
         )
     }
 }

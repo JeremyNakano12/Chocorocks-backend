@@ -30,7 +30,8 @@ object ProductBatchMapper {
             currentQuantity = entity.currentQuantity,
             batchCost = entity.batchCost,
             store = entity.store?.let { StoreMapper.toResponse(it) },
-            isActive = entity.isActive
+            isActive = entity.isActive,
+            createdAt = entity.createdAt
         )
     }
 }

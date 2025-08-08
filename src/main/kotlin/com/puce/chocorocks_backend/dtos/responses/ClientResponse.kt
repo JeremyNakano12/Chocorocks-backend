@@ -1,6 +1,7 @@
 package com.puce.chocorocks_backend.dtos.responses
 
 import com.puce.chocorocks_backend.models.entities.*
+import java.time.LocalDateTime
 
 data class ClientResponse(
     val id: Long,
@@ -11,5 +12,6 @@ data class ClientResponse(
     val email: String?,
     val address: String?,
     val requiresInvoice: Boolean,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val createdAt: LocalDateTime
 )

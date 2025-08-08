@@ -26,7 +26,8 @@ object UserMapper {
             typeIdentification = entity.typeIdentification,
             identificationNumber = entity.identificationNumber,
             phoneNumber = entity.phoneNumber,
-            isActive = entity.isActive
+            isActive = entity.isActive,
+            createdAt = entity.createdAt
         )
     }
 }

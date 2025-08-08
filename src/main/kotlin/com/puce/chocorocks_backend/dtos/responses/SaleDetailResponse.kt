@@ -10,5 +10,6 @@ data class SaleDetailResponse(
     val batch: ProductBatchResponse?,
     val quantity: Int,
     val unitPrice: BigDecimal,
-    val subtotal: BigDecimal
+    val subtotal: BigDecimal,
+    val createdAt: LocalDateTime
 )

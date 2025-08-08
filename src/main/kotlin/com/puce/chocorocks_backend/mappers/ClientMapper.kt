@@ -3,6 +3,7 @@ package com.puce.chocorocks_backend.mappers
 import com.puce.chocorocks_backend.dtos.requests.*
 import com.puce.chocorocks_backend.dtos.responses.*
 import com.puce.chocorocks_backend.models.entities.*
+import java.time.LocalDateTime
 
 object ClientMapper {
     fun toEntity(request: ClientRequest): Client {
@@ -28,7 +29,8 @@ object ClientMapper {
             email = entity.email,
             address = entity.address,
             requiresInvoice = entity.requiresInvoice,
-            isActive = entity.isActive
+            isActive = entity.isActive,
+            createdAt = entity.createdAt
         )
     }
 }

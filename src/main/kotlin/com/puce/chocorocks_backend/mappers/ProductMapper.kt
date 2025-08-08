@@ -38,7 +38,9 @@ object ProductMapper {
             minStockLevel = entity.minStockLevel,
             imageUrl = entity.imageUrl,
             barcode = entity.barcode,
-            isActive = entity.isActive
+            isActive = entity.isActive,
+            createdAt = entity.createdAt,
+
         )
     }
 }

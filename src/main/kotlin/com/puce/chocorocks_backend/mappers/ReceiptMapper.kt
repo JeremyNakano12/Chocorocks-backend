@@ -53,7 +53,8 @@ object ReceiptMapper {
             customerName = entity.customerName,
             customerIdentification = entity.customerIdentification,
             isPrinted = entity.isPrinted,
-            printCount = entity.printCount
+            printCount = entity.printCount,
+            createdAt = entity.createdAt
         )
     }
 }

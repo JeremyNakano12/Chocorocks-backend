@@ -46,7 +46,8 @@ object SaleMapper {
             totalAmount = entity.totalAmount,
             paymentMethod = entity.paymentMethod,
             notes = entity.notes,
-            isInvoiced = entity.isInvoiced
+            isInvoiced = entity.isInvoiced,
+            createdAt = entity.createdAt
         )
     }
 }

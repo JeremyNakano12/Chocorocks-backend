@@ -3,6 +3,7 @@ package com.puce.chocorocks_backend.dtos.responses
 import com.puce.chocorocks_backend.models.entities.*
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 data class ProductBatchResponse(
     val id: Long,
@@ -15,4 +16,5 @@ data class ProductBatchResponse(
     val batchCost: BigDecimal,
     val store: StoreResponse?,
     val isActive: Boolean,
+    val createdAt: LocalDateTime
 )
