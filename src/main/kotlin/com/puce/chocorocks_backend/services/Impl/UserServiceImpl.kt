@@ -12,14 +12,18 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import com.puce.chocorocks_backend.exceptions.*
 import com.puce.chocorocks_backend.utils.*
+import org.slf4j.LoggerFactory
 
 @Service
 @Transactional
 class UserServiceImpl(
     private val userRepository: UserRepository,
     private val userActivityService: UserActivityService,
-    private val userActivityHelper: UserActivityHelper
+    private val userActivityHelper: UserActivityHelper,
+    private val supabaseAuthService: SupabaseAuthService // Dependencia de Supabase
 ) : UserService {
+
+    private val logger = LoggerFactory.getLogger(UserServiceImpl::class.java)
 
     override fun findAll(): List<UserResponse> =
         userRepository.findAll().map { UserMapper.toResponse(it) }
@@ -37,6 +41,8 @@ class UserServiceImpl(
     }
 
     override fun save(request: UserRequest): UserResponse {
+        logger.info("🚀 Iniciando creación de usuario: ${request.email}")
+
         validateUserData(request)
 
         val emailExists = userRepository.existsByEmail(request.email)
@@ -54,6 +60,43 @@ class UserServiceImpl(
 
         val user = UserMapper.toEntity(request)
         val savedUser = userRepository.save(user)
+        logger.info("✅ Usuario guardado en DB local: ${savedUser.email} (ID: ${savedUser.id})")
+
+        try {
+            val metadata = mapOf(
+                "name" to savedUser.name,
+                "role" to savedUser.role.name,
+                "user_id" to savedUser.id.toString(),
+                "phone" to (savedUser.phoneNumber ?: ""),
+                "identification" to savedUser.identificationNumber,
+                "identification_type" to savedUser.typeIdentification.name,
+                "created_by_admin" to true
+            )
+
+            val supabaseUser = supabaseAuthService.createUser(
+                email = savedUser.email,
+                password = request.password,
+                metadata = metadata
+            )
+
+            if (supabaseUser == null) {
+                logger.error("❌ Error creando usuario en Supabase - Realizando rollback")
+                userRepository.delete(savedUser)
+                throw RuntimeException("Error creando usuario en Supabase. Usuario no creado.")
+            }
+
+            logger.info("✅ Usuario creado en Supabase: ${supabaseUser.id} para ${savedUser.email}")
+
+        } catch (e: Exception) {
+            logger.error("❌ Error en sincronización con Supabase: ${e.message}")
+            try {
+                userRepository.delete(savedUser)
+                logger.info("🔄 Rollback completado - Usuario eliminado de DB local")
+            } catch (rollbackError: Exception) {
+                logger.error("❌ Error en rollback: ${rollbackError.message}")
+            }
+            throw RuntimeException("Error sincronizando con Supabase: ${e.message}")
+        }
 
         try {
             val roleInfo = when (savedUser.role) {
@@ -65,15 +108,16 @@ class UserServiceImpl(
                 actionType = "CREATE",
                 tableName = "users",
                 recordId = savedUser.id,
-                description = "Creó usuario '${savedUser.name}' (${savedUser.email}) como $roleInfo - ${savedUser.typeIdentification}: ${savedUser.identificationNumber}"
+                description = "Creó usuario '${savedUser.name}' (${savedUser.email}) como $roleInfo - ${savedUser.typeIdentification}: ${savedUser.identificationNumber}. Usuario listo para login."
             )
             userActivityService.save(activityRequest)
 
-            println("✅ Actividad registrada: Usuario ${userActivityHelper.getCurrentUserEmail()} creó usuario ${savedUser.name}")
+            logger.info("✅ Actividad registrada: Usuario ${userActivityHelper.getCurrentUserEmail()} creó usuario ${savedUser.name}")
         } catch (e: Exception) {
-            println("❌ Error logging user activity: ${e.message}")
+            logger.warn("⚠️ Error logging user activity: ${e.message}")
         }
 
+        logger.info("🎉 Usuario creado exitosamente: ${savedUser.email}. Puede hacer login inmediatamente.")
         return UserMapper.toResponse(savedUser)
     }
 
@@ -166,7 +210,7 @@ class UserServiceImpl(
             )
             userActivityService.save(activityRequest)
         } catch (e: Exception) {
-            println("❌ Error logging user activity: ${e.message}")
+            logger.warn("❌ Error logging user activity: ${e.message}")
         }
 
         return UserMapper.toResponse(savedUser)
@@ -182,43 +226,19 @@ class UserServiceImpl(
                 )
             }
 
-        if (user.role == UserRole.ADMIN) {
-            val adminCount = userRepository.findAll().count { it.role == UserRole.ADMIN && it.isActive }
-            if (adminCount <= 1) {
-                throw InvalidOperationException(
-                    operation = "eliminar el usuario administrador '${user.name}'",
-                    reason = "es el último administrador activo",
-                    detalles = listOf("Debe haber al menos un administrador en el sistema")
-                )
-            }
-        }
-
         try {
-            val roleText = when (user.role) {
-                UserRole.ADMIN -> "Administrador"
-                UserRole.EMPLOYEE -> "Empleado"
-            }
-
             val activityRequest = userActivityHelper.createActivityRequest(
                 actionType = "DELETE",
                 tableName = "users",
                 recordId = user.id,
-                description = "Eliminó usuario '${user.name}' (${user.email}) - $roleText ${user.typeIdentification}: ${user.identificationNumber}"
+                description = "Eliminó usuario '${user.name}' (${user.email}) - ${user.typeIdentification}: ${user.identificationNumber}"
             )
             userActivityService.save(activityRequest)
         } catch (e: Exception) {
-            println("❌ Error logging user activity: ${e.message}")
+            logger.warn("❌ Error logging user activity: ${e.message}")
         }
 
-        try {
-            userRepository.deleteById(id)
-        } catch (ex: Exception) {
-            throw InvalidOperationException(
-                operation = "eliminar el usuario '${user.name}'",
-                reason = "tiene ventas o actividades asociadas",
-                detalles = listOf("No se puede eliminar un usuario con historial en el sistema")
-            )
-        }
+        userRepository.delete(user)
     }
 
     private fun validateUserData(request: UserRequest) {
@@ -233,6 +253,20 @@ class UserServiceImpl(
             throw BusinessValidationException(
                 message = "El email del usuario no es válido",
                 detalles = listOf("Proporcione un email con formato válido")
+            )
+        }
+
+        if (request.password.isBlank()) {
+            throw BusinessValidationException(
+                message = "La contraseña no puede estar vacía",
+                detalles = listOf("Proporcione una contraseña válida")
+            )
+        }
+
+        if (request.password.length < 6) {
+            throw BusinessValidationException(
+                message = "La contraseña debe tener al menos 6 caracteres",
+                detalles = listOf("Contraseña actual: ${request.password.length} caracteres")
             )
         }
 

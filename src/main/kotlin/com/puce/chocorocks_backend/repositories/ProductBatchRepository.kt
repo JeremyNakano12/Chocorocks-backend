@@ -34,4 +34,7 @@ interface ProductBatchRepository : JpaRepository<ProductBatch, Long> {
 
     @Query("SELECT pb FROM ProductBatch pb WHERE pb.expirationDate BETWEEN CURRENT_DATE AND :futureDate AND pb.currentQuantity > 0 AND pb.isActive = true ORDER BY pb.expirationDate ASC")
     fun findBatchesExpiringWithinDays(@Param("futureDate") futureDate: LocalDate): List<ProductBatch>
+
+    @Query("SELECT pb.currentQuantity FROM ProductBatch pb WHERE pb.id = :batchId")
+    fun getCurrentQuantityById(@Param("batchId") batchId: Long): Int?
 }

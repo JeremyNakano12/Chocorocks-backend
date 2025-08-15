@@ -76,8 +76,9 @@ class SaleDetailServiceImpl(
 
             ValidationUtils.validateBatchNotExpired(productBatch.expirationDate, productBatch.batchCode)
 
+            val currentQuantity = productBatchRepository.getCurrentQuantityById(it) ?: 0
             ValidationUtils.validateSufficientStock(
-                available = productBatch.currentQuantity,
+                available = currentQuantity,
                 requested = request.quantity,
                 productName = product.nameProduct
             )
@@ -164,7 +165,8 @@ class SaleDetailServiceImpl(
 
             ValidationUtils.validateBatchNotExpired(productBatch.expirationDate, productBatch.batchCode)
 
-            val availableQuantity = productBatch.currentQuantity + existingSaleDetail.quantity
+            val currentQuantity = productBatchRepository.getCurrentQuantityById(it) ?: 0
+            val availableQuantity = currentQuantity + existingSaleDetail.quantity
             ValidationUtils.validateSufficientStock(
                 available = availableQuantity,
                 requested = request.quantity,
@@ -275,7 +277,7 @@ class SaleDetailServiceImpl(
                 productionDate = batch.productionDate,
                 expirationDate = batch.expirationDate,
                 initialQuantity = batch.initialQuantity,
-                currentQuantity = batch.currentQuantity - saleDetail.quantity,
+                currentQuantity = (productBatchRepository.getCurrentQuantityById(batch.id) ?: 0) - saleDetail.quantity,
                 batchCost = batch.batchCost,
                 store = batch.store,
                 isActive = batch.isActive
@@ -344,7 +346,6 @@ class SaleDetailServiceImpl(
     }
 
     private fun restoreStockAfterDelete(saleDetail: SaleDetail) {
-        // Restaurar stock del lote si existe
         saleDetail.batch?.let { batch ->
             val updatedBatch = ProductBatch(
                 batchCode = batch.batchCode,
@@ -361,7 +362,6 @@ class SaleDetailServiceImpl(
             productBatchRepository.save(updatedBatch)
         }
 
-        // Restaurar stock de la tienda
         val productStore = productStoreRepository.findByProductIdAndStoreId(
             saleDetail.product.id,
             saleDetail.sale.store.id

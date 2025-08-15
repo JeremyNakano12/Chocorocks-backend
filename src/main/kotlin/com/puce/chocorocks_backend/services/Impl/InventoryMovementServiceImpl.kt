@@ -63,9 +63,10 @@ class InventoryMovementServiceImpl(
                     )
                 }
 
-            if (request.movementType == MovementType.OUT) {
+            if (request.movementType == MovementType.OUT && request.reason != MovementReason.SALE) {
+                val currentQuantity = productBatchRepository.getCurrentQuantityById(it) ?: 0
                 ValidationUtils.validateSufficientStock(
-                    available = productBatch.currentQuantity,
+                    available = currentQuantity,
                     requested = request.quantity,
                     productName = product.nameProduct
                 )

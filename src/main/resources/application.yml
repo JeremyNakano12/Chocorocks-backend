@@ -45,6 +45,8 @@ supabase:
     key: ${SUPABASE_ANON_KEY:AnonKey}
   jwt:
     secret: ${SUPABASE_JWT_SECRET:Secret}
+  service:
+    key: ${SUPABASE_SERVICE_KEY:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqeGtyenZvd3VicnNscHh0bnVoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzgyOTQ1MSwiZXhwIjoyMDY5NDA1NDUxfQ.8O3otV82qf5yDAW4wBOuK2kza_qL91TZYdtaUOXyoFw}
 
 app:
   company:
@@ -54,7 +56,7 @@ app:
     encoding: UTF-8
     format-output: true
   data:
-    seed: ${ENABLE_DATA_SEEDING:true}
+    seed: ${ENABLE_DATA_SEEDING:false}
 
 logging:
   level:

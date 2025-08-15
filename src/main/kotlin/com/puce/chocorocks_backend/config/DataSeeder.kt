@@ -33,7 +33,6 @@ class DataSeeder(
         try {
             createDefaultCategories()
             createDefaultStores()
-            createDefaultUsers()
             createDefaultClients()
             createDefaultProducts()
 
@@ -116,48 +115,48 @@ class DataSeeder(
         }
     }
 
-    private fun createDefaultUsers() {
-        logger.info("👥 Creando usuarios por defecto...")
+   // private fun createDefaultUsers() {
+    //    logger.info("👥 Creando usuarios por defecto...")
 
-        val users = listOf(
-            UserRequest(
-                name = "Administrador Principal",
-                email = "admin@chocorocks.com",
-                role = UserRole.ADMIN,
-                typeIdentification = IdentificationType.CEDULA,
-                identificationNumber = "1234567890",
-                phoneNumber = "0999888777",
-                isActive = true
-            ),
-            UserRequest(
-                name = "María González",
-                email = "maria.gonzalez@chocorocks.com",
-                role = UserRole.EMPLOYEE,
-                typeIdentification = IdentificationType.CEDULA,
-                identificationNumber = "0987654321",
-                phoneNumber = "0999777666",
-                isActive = true
-            ),
-            UserRequest(
-                name = "Carlos Pérez",
-                email = "carlos.perez@chocorocks.com",
-                role = UserRole.EMPLOYEE,
-                typeIdentification = IdentificationType.CEDULA,
-                identificationNumber = "1122334455",
-                phoneNumber = "0999666555",
-                isActive = true
-            )
-        )
+    //    val users = listOf(
+     //       UserRequest(
+       //         name = "Administrador Principal",
+        //        email = "admin@chocorocks.com",
+          //      role = UserRole.ADMIN,
+         //       typeIdentification = IdentificationType.CEDULA,
+         //       identificationNumber = "1234567890",
+       //         phoneNumber = "0999888777",
+       //         isActive = true
+       //     ),
+       //     UserRequest(
+        //        name = "María González",
+         //       email = "maria.gonzalez@chocorocks.com",
+         //       role = UserRole.EMPLOYEE,
+           //     typeIdentification = IdentificationType.CEDULA,
+          //      identificationNumber = "0987654321",
+            //    phoneNumber = "0999777666",
+           //     isActive = true
+          //  ),
+         //   UserRequest(
+          //      name = "Carlos Pérez",
+            //    email = "carlos.perez@chocorocks.com",
+            //    role = UserRole.EMPLOYEE,
+             //   typeIdentification = IdentificationType.CEDULA,
+             //   identificationNumber = "1122334455",
+              //  phoneNumber = "0999666555",
+           //     isActive = true
+           // )
+       // )
 
-        users.forEach { userRequest ->
-            try {
-                userService.save(userRequest)
-                logger.info("✅ Usuario creado: ${userRequest.email}")
-            } catch (e: Exception) {
-                logger.warn("⚠️ Usuario ya existe o error: ${userRequest.email} - ${e.message}")
-            }
-        }
-    }
+       // users.forEach { userRequest ->
+        //    try {
+         //       userService.save(userRequest)
+         //       logger.info("✅ Usuario creado: ${userRequest.email}")
+          //  } catch (e: Exception) {
+           //     logger.warn("⚠️ Usuario ya existe o error: ${userRequest.email} - ${e.message}")
+           // }
+        //}
+   // }
 
     private fun createDefaultClients() {
         logger.info("👤 Creando clientes por defecto...")
