@@ -76,17 +76,11 @@ class SaleController(
         @PathVariable id: Long,
         @RequestBody request: CompleteWithReceiptRequest
     ): ResponseEntity<ReceiptResponse> {
-        return try {
-            val receipt = saleServiceImpl.completeWithReceipt(
-                id = id,
-                paymentMethod = request.paymentMethod,
-                additionalNotes = request.additionalNotes
-            )
-            ResponseEntity.status(HttpStatus.CREATED).body(receipt)
-        } catch (e: EntityNotFoundException) {
-            ResponseEntity.notFound().build()
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().build()
-        }
+        val receipt = saleServiceImpl.completeWithReceipt(
+            id = id,
+            paymentMethod = request.paymentMethod,
+            additionalNotes = request.additionalNotes
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(receipt)
     }
 }

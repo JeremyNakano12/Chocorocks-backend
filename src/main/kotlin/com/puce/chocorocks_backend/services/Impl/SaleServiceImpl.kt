@@ -267,7 +267,7 @@ class SaleServiceImpl(
             }
 
         val receiptRequest = ReceiptRequest(
-            receiptNumber = "REC-${sale.saleNumber}",
+            receiptNumber = receiptService.generateReceiptNumber(sale.store.id),
             userId = sale.user.id,
             clientId = sale.client?.id,
             saleId = sale.id,
